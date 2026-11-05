@@ -27,7 +27,7 @@ const cloudFor = (team: TeamConfig, keychain: Keychain, f: typeof fetch = fetch)
 async function brokeredTracker(ctx: Ctx) {
   const cloud = cloudFor(ctx.team, ctx.keychain, ctx.fetch);
   if (!cloud || ctx.team.tracker.kind !== "linear") return null;
-  if (await ctx.keychain.get("linear-token")) return null; // A personal key still works if the team hasn't moved to the broker.
+  if ((await ctx.keychain.get("linear-token")) || (await ctx.keychain.get("linear-oauth"))) return null; // A personal key or Linear sign-in still works if the team hasn't moved to the broker.
   const { accessToken } = await cloud.call<{ accessToken: string }>("POST", `/orgs/${ctx.team.controlPlane!.orgId}/linear/token`);
   return linearTracker({ token: accessToken, teamKey: ctx.team.tracker.teamKey, projectId: ctx.team.tracker.projectId, fetch: ctx.fetch });
 }
@@ -35,7 +35,7 @@ async function brokeredTracker(ctx: Ctx) {
 /** Another team's project, through the same brokered token (COMPANY-1). */
 async function brokeredProject(ctx: Ctx, p: { teamKey: string; projectId: string }) {
   const cloud = cloudFor(ctx.team, ctx.keychain, ctx.fetch);
-  if (!cloud || (await ctx.keychain.get("linear-token"))) return null;
+  if (!cloud || (await ctx.keychain.get("linear-token")) || (await ctx.keychain.get("linear-oauth"))) return null;
   const { accessToken } = await cloud.call<{ accessToken: string }>("POST", `/orgs/${ctx.team.controlPlane!.orgId}/linear/token`);
   return linearTracker({ token: accessToken, teamKey: p.teamKey, projectId: p.projectId, fetch: ctx.fetch });
 }

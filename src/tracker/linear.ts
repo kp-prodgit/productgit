@@ -28,6 +28,43 @@ const ISSUE_FIELDS = `id identifier title description url priority createdAt
   project { id }
   labels { nodes { id name parent { name } } }`;
 
+/** Linear issue nodes as both the API and the Claude relay snapshot carry them (one mapping, CANVAS-2). */
+export const kindOf = (n: any) => n.labels.nodes.find((l: any) => l.parent?.name === GROUPS.kind)?.name ?? "task";
+
+export function toTask(n: any): Task {
+  const ls: { name: string; group: string | null }[] = n.labels.nodes.map((l: any) => ({ name: l.name, group: l.parent?.name ?? null }));
+  const pick = (g: Group) => ls.find((l) => l.group === GROUPS[g])?.name ?? null;
+  const status = pick("status");
+  const size = pick("size");
+  const desc: string = n.description ?? "";
+  return {
+    id: n.id,
+    identifier: n.identifier,
+    title: n.title,
+    description: desc,
+    url: n.url,
+    category: pick("category"),
+    size: SIZES.includes(size as Size) ? (size as Size) : null,
+    status: STATUSES.includes(status as Status) ? (status as Status) : null,
+    priority: n.priority ?? 0,
+    agent: pick("agent"),
+    sources: [...desc.matchAll(/^pmx:source (\S+)/gm)].map((m) => m[1]!),
+    prUrl: ((n.comments?.nodes ?? []) as any[]).map((c) => c.body?.match(/^pmx:pr (\S+)/m)?.[1]).filter(Boolean).at(-1) ?? null,
+    createdAt: n.createdAt,
+  };
+}
+
+export function toMeeting(n: any): MeetingEntry {
+  const t = toTask(n);
+  return {
+    id: t.id, identifier: t.identifier, url: t.url, title: t.title,
+    keys: [...t.description.matchAll(/^pmx:meeting (\S+)/gm)].map((m) => m[1]!),
+    status: t.status === "done" ? "done" : t.status === "blocked" ? "blocked" : "running",
+    tasks: [...t.description.matchAll(/^pmx:task (\S+)/gm)].map((m) => m[1]!),
+    agent: t.agent,
+  };
+}
+
 export function linearTracker(o: LinearOpts): Tracker {
   const f = o.fetch ?? fetch;
   const auth = o.token.startsWith("lin_api_") ? o.token : `Bearer ${o.token}`;
@@ -85,8 +122,6 @@ export function linearTracker(o: LinearOpts): Tracker {
     return created.id;
   }
 
-  const kindOf = (n: any) => n.labels.nodes.find((l: any) => l.parent?.name === GROUPS.kind)?.name ?? "task";
-
   async function allIssues(): Promise<any[]> {
     const out: any[] = [];
     let after: string | null = null;
@@ -102,44 +137,10 @@ export function linearTracker(o: LinearOpts): Tracker {
     return out;
   }
 
-  function toMeeting(n: any): MeetingEntry {
-    const t = toTask(n);
-    return {
-      id: t.id, identifier: t.identifier, url: t.url, title: t.title,
-      keys: [...t.description.matchAll(/^pmx:meeting (\S+)/gm)].map((m) => m[1]!),
-      status: t.status === "done" ? "done" : t.status === "blocked" ? "blocked" : "running",
-      tasks: [...t.description.matchAll(/^pmx:task (\S+)/gm)].map((m) => m[1]!),
-      agent: t.agent,
-    };
-  }
-
   /** The team's first workflow state of type "completed", so a finished meeting shows as Done in Linear. */
   async function completedState(): Promise<string | null> {
     const d = await gql(`query($id: String!) { team(id: $id) { states { nodes { id type position } } } }`, { id: await team() });
     return (d.team.states.nodes as any[]).filter((x) => x.type === "completed").sort((a, b) => a.position - b.position)[0]?.id ?? null;
-  }
-
-  function toTask(n: any): Task {
-    const ls: { name: string; group: string | null }[] = n.labels.nodes.map((l: any) => ({ name: l.name, group: l.parent?.name ?? null }));
-    const pick = (g: Group) => ls.find((l) => l.group === GROUPS[g])?.name ?? null;
-    const status = pick("status");
-    const size = pick("size");
-    const desc: string = n.description ?? "";
-    return {
-      id: n.id,
-      identifier: n.identifier,
-      title: n.title,
-      description: desc,
-      url: n.url,
-      category: pick("category"),
-      size: SIZES.includes(size as Size) ? (size as Size) : null,
-      status: STATUSES.includes(status as Status) ? (status as Status) : null,
-      priority: n.priority ?? 0,
-      agent: pick("agent"),
-      sources: [...desc.matchAll(/^pmx:source (\S+)/gm)].map((m) => m[1]!),
-      prUrl: ((n.comments?.nodes ?? []) as any[]).map((c) => c.body?.match(/^pmx:pr (\S+)/m)?.[1]).filter(Boolean).at(-1) ?? null,
-      createdAt: n.createdAt,
-    };
   }
 
   /** SEC-4: refuse any write to an issue outside the PMX project. */

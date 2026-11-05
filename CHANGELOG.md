@@ -2,6 +2,13 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.7.0: Linear without an API key, and Claude tasks you can see
+
+- **`pmx linear login` (LINEAR-1).** Sign in to Linear in the browser (OAuth with PKCE, no client secret). The access lives in the keychain and renews itself every 24 hours. `pmx linear logout` revokes it; `pmx linear status` shows how this machine reaches Linear.
+- **Claude relays Linear when there's no key or sign-in (LINEAR-2).** A scheduled task in the PM's Claude app uses their Linear connector: it applies the exact changes PMX queued (`~/.pmx/linear/outbox.json`), reports each result, and exports the PMX project as a snapshot PMX reads. PMX checks every result and snapshot, keeps every rule in its own code, and holds meeting claims for a day so the ledger stays safe between syncs.
+- **`pmx schedule` (CLAUDE-1).** PMX can't create Claude tasks itself, so it lists the ones this machine needs, says whether each exists, and prints a request to paste into the Claude app. `pmx init` points to it, and `pmx doctor` warns about missing tasks.
+- Compatibility fixtures for files as 0.6.0 wrote them (COMPAT-4).
+
 ## 0.6.0: automatic updates
 
 - **Background auto-update (COMPAT-6).** When a team turns it on (`pmx vendor --require --auto-update`), every machine's background job checks hourly and installs the team's version from the PMX repo when it's newer. It never downgrades, and never replaces a source checkout. If npm needs `sudo`, PMX can't type a password, so it says so once per version, in a notification and in `pmx doctor`.

@@ -131,7 +131,7 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   // 4. Secrets go to the keychain only (SEC-10).
   const secrets: [Parameters<Keychain["set"]>[0], string, boolean][] = [
     ["slack-token", "Slack bot token, read-only scopes plus chat:write for DMs (blank to skip)", !!slackChannel || team.synthesizer === handle],
-    ["linear-token", "Linear API key with access to the PMX project (blank to skip)", team.tracker.kind === "linear" && !d.invite],
+    ["linear-token", "Linear API key with access to the PMX project (blank to skip: sign in later with `pmx linear login`, or let Claude talk to Linear for you)", team.tracker.kind === "linear" && !d.invite],
     ["github-token", "GitHub token for opening PRs in the PMX repo (blank to use `gh`)", !!(await git.remoteUrl())?.includes("github.com")],
   ];
   for (const [name, q, needed] of secrets) {
@@ -169,5 +169,6 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
 
   out.info("\nSetup done. The first week runs pulls as dry runs, so you can see what your agent would do.");
   out.info(`Next: put call transcripts in ${transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
+  out.info("Then set up PMX's tasks in your Claude app, which collect meetings from your connectors (and talk to Linear if you didn't sign in): run `pmx schedule` and paste what it prints into the Claude app.");
   return personal;
 }

@@ -127,7 +127,9 @@ export async function synthesize(
   else {
     for (const f of plan.fresh) {
       const lease = `meeting-${f.item.keys![0]}`;
-      const got = await svc.lease.acquire(lease, ctx.agent, 1800);
+      // Through the Claude relay the ledger entry reaches Linear only at the next sync, so the claim is
+      // held for a day instead of released, and other machines still skip the meeting meanwhile (MEET-2).
+      const got = await svc.lease.acquire(lease, ctx.agent, svc.tracker.kind === "claude-relay" ? 26 * 3600 : 1800);
       if (!got.ok) {
         mark(f.item, "in-progress-elsewhere", f.entry?.identifier ?? null);
         result0.meetings.busy++;
@@ -141,7 +143,10 @@ export async function synthesize(
     }
   }
   const work = [...plan.other, ...(o.dryRun ? plan.fresh.map((f) => f.item) : lodged.map((l) => l.item))];
-  const release = async () => { for (const l of lodged) await svc.lease.release(l.lease, ctx.agent).catch(() => false); };
+  const release = async () => {
+    if (svc.tracker.kind === "claude-relay") return;
+    for (const l of lodged) await svc.lease.release(l.lease, ctx.agent).catch(() => false);
+  };
   // Polling (MEET-3): with nothing new, no model call and no receipt.
   if (o.skipIfNothingNew && !lodged.length && !(o.dryRun && plan.fresh.length)) return result0;
   if (!work.length) {

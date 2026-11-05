@@ -1,6 +1,8 @@
 import { gitRefLease } from "../lease/git-ref.js";
 import type { LeaseProvider } from "../lease/types.js";
 import { linearTracker } from "../tracker/linear.js";
+import { relayTracker } from "../tracker/relay.js";
+import { linearAccessToken } from "../linear/oauth.js";
 import { memoryTracker, type Tracker } from "../tracker/types.js";
 import type { Ctx } from "./context.js";
 import type { PersonalConfig, TeamConfig } from "./config.js";
@@ -69,8 +71,8 @@ export async function services(ctx: Ctx, test?: Partial<Services>): Promise<Serv
 export async function projectTracker(ctx: Ctx, p: ProjectRef): Promise<Tracker> {
   const viaEe = await overrides.project?.(ctx, p);
   if (viaEe) return viaEe;
-  const token = await ctx.keychain.get("linear-token");
-  if (!token) throw new Error("No Linear token in the keychain. Run `pmx init`, or `pmx login` if your team uses the control plane.");
+  const token = (await ctx.keychain.get("linear-token")) ?? (await linearAccessToken(ctx.keychain, ctx.fetch, ctx.now()));
+  if (!token) throw new Error("The company roll-up reads several Linear projects, which the Claude relay doesn't cover. Run `pmx linear login` on the company machine.");
   return linearTracker({ token, teamKey: p.teamKey, projectId: p.projectId, fetch: ctx.fetch });
 }
 
@@ -80,7 +82,8 @@ async function defaultTracker(ctx: Ctx): Promise<Tracker> {
     ctx.out.warn("No tracker configured in pmx.config.json; using an empty in-memory queue.");
     return memoryTracker();
   }
-  const token = await ctx.keychain.get("linear-token");
-  if (!token) throw new Error("No Linear token in the keychain. Run `pmx init`, or `pmx login` if your team uses the control plane.");
-  return linearTracker({ token, teamKey: t.teamKey, projectId: t.projectId, fetch: ctx.fetch });
+  // LINEAR-1, LINEAR-2: an API key, else the PM's Linear sign-in, else Claude relays through its connector.
+  const token = (await ctx.keychain.get("linear-token")) ?? (await linearAccessToken(ctx.keychain, ctx.fetch, ctx.now()));
+  if (token) return linearTracker({ token, teamKey: t.teamKey, projectId: t.projectId, fetch: ctx.fetch });
+  return relayTracker(ctx.team, (m) => ctx.out.warn(m), ctx.now);
 }

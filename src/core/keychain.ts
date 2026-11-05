@@ -2,7 +2,7 @@ import { exec as defaultExec, type Exec } from "./exec.js";
 import { KEYCHAIN_SERVICE } from "./paths.js";
 
 /** Secret names Product Git stores. Values live only in the macOS keychain (SEC-10). */
-export type SecretName = "slack-token" | "linear-token" | "github-token" | "machine-token" | "anthropic-api-key";
+export type SecretName = "slack-token" | "linear-token" | "linear-oauth" | "github-token" | "machine-token" | "anthropic-api-key";
 
 export interface Keychain {
   get(name: SecretName): Promise<string | null>;
@@ -11,7 +11,7 @@ export interface Keychain {
   list(): Promise<SecretName[]>;
 }
 
-const ALL: SecretName[] = ["slack-token", "linear-token", "github-token", "machine-token", "anthropic-api-key"];
+const ALL: SecretName[] = ["slack-token", "linear-token", "linear-oauth", "github-token", "machine-token", "anthropic-api-key"];
 
 export function macKeychain(exec: Exec = defaultExec): Keychain {
   return {

@@ -31,6 +31,7 @@ import { reviewCommand } from "./review.js";
 import { cloudCommands } from "./cloud.js";
 import { companyStep, meetingCommands, todoStep } from "./meetings.js";
 import { updateStep } from "./autoupdate.js";
+import { linearCommands } from "./linear.js";
 import { syncAnalytics } from "../cloud/account.js";
 
 export interface RunArgs {
@@ -224,6 +225,7 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
     },
   },
   ...meetingCommands,
+  ...linearCommands,
   ...teamCommands,
   reviewCommand,
   ...cloudCommands,

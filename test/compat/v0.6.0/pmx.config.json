@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "team": "product",
+  "model": "claude-sonnet-5-5",
+  "categories": {
+    "research-synthesis": {
+      "skill": "pmx-research"
+    },
+    "spec": {
+      "skill": "pmx-spec"
+    }
+  },
+  "sizes": {
+    "S": {
+      "minutes": 15,
+      "costUsd": 0.5
+    },
+    "M": {
+      "minutes": 30,
+      "costUsd": 1.5
+    },
+    "L": {
+      "minutes": 60,
+      "costUsd": 4
+    },
+    "XL": {
+      "minutes": 120,
+      "costUsd": 8
+    }
+  },
+  "tracker": {
+    "kind": "none"
+  },
+  "lease": "git",
+  "reviewQueueCap": 3,
+  "egress": [
+    "api.anthropic.com",
+    "api.linear.app",
+    "github.com",
+    "api.github.com"
+  ],
+  "allowedSources": [
+    "transcripts"
+  ],
+  "slackChannels": [],
+  "allowPrivateChannels": false,
+  "internalDomains": [
+    "example.com"
+  ],
+  "synthesizer": null,
+  "caps": {
+    "perRunUsd": 3,
+    "perDayUsd": 20
+  },
+  "autoPause": {
+    "minVerdicts": 5,
+    "threshold": 0.3,
+    "windowDays": 30
+  },
+  "cli": {
+    "min": "0.6.0",
+    "autoUpdate": true
+  },
+  "controlPlane": {
+    "url": "https://api.productgit.com/v1",
+    "orgId": "org_abc"
+  },
+  "company": null
+}
