@@ -2,6 +2,12 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.6.0: automatic updates
+
+- **Background auto-update (COMPAT-6).** When a team turns it on (`pmx vendor --require --auto-update`), every machine's background job checks hourly and installs the team's version from the PMX repo when it's newer. It never downgrades, and never replaces a source checkout. If npm needs `sudo`, PMX can't type a password, so it says so once per version, in a notification and in `pmx doctor`.
+- `pmx update` and the background job share one installer.
+- Compatibility fixtures for files as 0.5.0 wrote them (COMPAT-4).
+
 ## 0.5.0: explainable runs, free hosted app, brain, meetings from connectors, safe updates
 
 Everything since 0.4.0, which shipped several times under that number:

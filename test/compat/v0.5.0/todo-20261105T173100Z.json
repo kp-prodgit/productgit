@@ -1,0 +1,96 @@
+{
+  "v": 1,
+  "id": "todo-20261105T173100Z",
+  "type": "todo",
+  "at": "2026-11-05T02:22:19.000Z",
+  "agent": "ana@m1",
+  "outcome": "staged",
+  "window": {
+    "days": 1,
+    "since": "2026-11-05T00:00:00.000Z",
+    "scope": "individual"
+  },
+  "rules": {
+    "internalDomains": [
+      "example.com"
+    ],
+    "requireExternalParticipant": false,
+    "topicRulesHash": "abc",
+    "neverIngest": {
+      "people": 0,
+      "channels": 0,
+      "meetingTitles": 0
+    },
+    "folders": [
+      "/tmp/pmx-compat-calls"
+    ],
+    "allowOneOnOne": true
+  },
+  "skippedSources": [],
+  "sources": [
+    {
+      "kind": "transcript",
+      "refHash": "a1",
+      "decision": "used",
+      "id": "T1",
+      "file": "northfield.md",
+      "title": "Northfield discovery",
+      "at": "2026-11-03",
+      "detail": "has someone from outside the company (northfield.com)",
+      "passagesCut": [
+        {
+          "rule": "health",
+          "hash": "h1"
+        }
+      ],
+      "passagesUsed": 4,
+      "ledger": {
+        "state": "processed-now",
+        "entry": null
+      }
+    },
+    {
+      "kind": "transcript",
+      "refHash": "b2",
+      "decision": "left-out",
+      "rule": "no-external-participant",
+      "detail": "everyone is on your company's domains (example.com)",
+      "passagesCut": [],
+      "passagesUsed": 0
+    }
+  ],
+  "masked": {
+    "email": 1,
+    "phone": 1,
+    "card": 0,
+    "id": 0,
+    "person": 0
+  },
+  "skills": [
+    {
+      "name": "pmx-digest",
+      "version": "1a2b3c",
+      "source": "team"
+    }
+  ],
+  "model": {
+    "name": "claude-sonnet-5-5",
+    "runtime": "claude-code",
+    "tools": "none",
+    "costUsd": 0.02,
+    "tokens": 4100,
+    "durationMs": 9000,
+    "promptSha256": "f00"
+  },
+  "todo": {
+    "added": [
+      {
+        "text": "Send Sam the pricing sheet",
+        "source": "T1",
+        "due": "2026-11-07"
+      }
+    ],
+    "duplicates": 0,
+    "dropped": []
+  }
+}

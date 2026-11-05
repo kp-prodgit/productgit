@@ -1,3 +1,4 @@
+import { notify } from "../core/notify.js";
 import type { Asker } from "../core/ask.js";
 import { isoWeek, type Ctx } from "../core/context.js";
 import { totalHeld } from "../core/filter.js";
@@ -58,10 +59,4 @@ export async function runDigest(ctx: Ctx, ask: Asker, o: { stage?: boolean; revi
   await log.record({ type: "digest", agent: ctx.agent, machine: ctx.personal.machineId, outcome: "approved", items: 0, held: 0, durationMs: 0, tokens: null, costUsd: null });
   const dm = await dmDigest(ctx, markdown).catch((e) => (ctx.out.warn(`Slack DM failed: ${e.message}`), false));
   return `Approved. ${pr.url.startsWith("branch:") ? `Committed on ${pr.url.slice(7)}` : `PR: ${pr.url}`}${dm ? " · sent to your Slack DMs" : ""}`;
-}
-
-async function notify(title: string, message: string): Promise<void> {
-  if (process.env.PMX_NO_NOTIFY) return;
-  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  await exec("osascript", ["-e", `display notification "${esc(message)}" with title "${esc(title)}"`]);
 }

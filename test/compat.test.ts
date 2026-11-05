@@ -19,11 +19,12 @@ import { linearTracker } from "../src/tracker/linear.js";
 import { freshHome, pmxRepo, testCtx, tmp } from "./helpers.js";
 
 const OLD = new URL("./compat/v0.4.0/", import.meta.url).pathname;
+const V05 = new URL("./compat/v0.5.0/", import.meta.url).pathname;
 const old = (f: string) => join(OLD, f);
 
 describe("versions (COMPAT-1)", () => {
-  it("this release is 0.5.0 and versions compare by number", () => {
-    expect(currentVersion()).toBe("0.5.0");
+  it("this release is 0.6.0 and versions compare by number", () => {
+    expect(currentVersion()).toBe("0.6.0");
     expect(compareVersions("0.10.0", "0.9.0")).toBe(1);
     expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
     expect(compareVersions("dev", "1.0.0")).toBeNull();
@@ -86,6 +87,30 @@ describe("reading what 0.4.0 wrote (COMPAT-4)", () => {
   });
 });
 
+describe("reading what 0.5.0 wrote (COMPAT-4)", () => {
+  beforeEach(freshHome);
+
+  it("loads 0.5.0 configs, state, to-dos and a to-do receipt", async () => {
+    const repo = await tmp("compat05-");
+    await copyFile(join(V05, "pmx.config.json"), join(repo, "pmx.config.json"));
+    const team = await loadTeamConfig(repo);
+    expect(team.cli).toEqual({ min: "0.5.0" }); // no autoUpdate: off, as before
+    await copyFile(join(V05, "config.json"), paths.config());
+    const p = await loadPersonalConfig();
+    expect(analyticsOn(p)).toBe(true);
+    expect(cloudTarget(team, p)?.orgId).toBe("org_abc");
+    await copyFile(join(V05, "state.json"), paths.state());
+    expect(await loadState()).toMatchObject({ lastCollectAt: "2026-11-05T17:30:00.000Z", autoUpdate: null });
+    await copyFile(join(V05, "todos.json"), paths.todos());
+    expect((await loadTodos()).items[0]).toMatchObject({ text: "Send Sam the pricing sheet", status: "open" });
+    await mkdir(paths.receipts(), { recursive: true });
+    await copyFile(join(V05, "todo-20261105T173100Z.json"), join(paths.receipts(), "todo-20261105T173100Z.json"));
+    const r = (await readReceipt("todo-20261105T173100Z"))!;
+    expect(formatReceipt(r, [])).toContain("Your to-dos");
+    expect(pipelineEvents([r], null)).toEqual([]); // still private
+  });
+});
+
 describe("files from a newer pmx (COMPAT-3)", () => {
   beforeEach(freshHome);
 
@@ -120,7 +145,7 @@ describe("team minimum version (COMPAT-2)", () => {
   it("stops shared team work on an older machine but keeps personal work going", async () => {
     const { repo } = await pmxRepo();
     const ctx = await testCtx({ repo, team: { cli: { min: "9.0.0" } } });
-    await expect(services(ctx)).rejects.toThrow(/runs pmx 0\.5\.0, and your team needs 9\.0\.0.*pmx update/);
+    await expect(services(ctx)).rejects.toThrow(/runs pmx 0\.6\.0, and your team needs 9\.0\.0.*pmx update/);
     await expect(refreshTodos(ctx)).resolves.toMatchObject({ added: [] });
 
     const ok = await testCtx({ repo, team: { cli: { min: "0.5.0" } } });
@@ -143,17 +168,17 @@ describe("version handshake with the hosted app (COMPAT-5)", () => {
     let status = 200;
     const f = (async (_url: string, init: any) => {
       seen.push(init.headers);
-      const body = status === 426 ? { error: "cli_too_old", message: "old", min: "0.6.0", latest: "0.7.0" } : { ok: true };
+      const body = status === 426 ? { error: "cli_too_old", message: "old", min: "0.7.0", latest: "0.8.0" } : { ok: true };
       return new Response(JSON.stringify(body), { status, headers: { "x-pmx-latest-version": "0.7.0", "x-pmx-min-version": "0.4.0" } });
     }) as any;
     const cloud = new Cloud("https://api.test/v1", memoryKeychain({ "machine-token": "pmxm_x" }), f);
     await cloud.call("GET", "/me");
-    expect(seen[0]!["x-pmx-version"]).toBe("0.5.0");
+    expect(seen[0]!["x-pmx-version"]).toBe("0.6.0");
     expect((await loadState()).cloudVersions).toMatchObject({ latest: "0.7.0", min: "0.4.0" });
 
     status = 426;
     const err = await cloud.call("GET", "/me").catch((e) => e);
     expect(err).toBeInstanceOf(CloudError);
-    expect(err.message).toMatch(/needs pmx 0\.6\.0 or newer; this is 0\.5\.0.*pmx update/);
+    expect(err.message).toMatch(/needs pmx 0\.7\.0 or newer; this is 0\.6\.0.*pmx update/);
   });
 });

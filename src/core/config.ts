@@ -31,8 +31,11 @@ export interface TeamConfig {
   autoPause: { minVerdicts: number; threshold: number; windowDays: number };
   controlPlane?: { url: string; orgId: string };
   /** Company roll-up (COMPANY-1): this repo's tracker is the company project; these are the teams it merges. */
-  /** The oldest pmx allowed to do shared team work (COMPAT-2). Set it with `pmx vendor --require`. */
-  cli?: { min: string } | null;
+  /**
+   * The oldest pmx allowed to do shared team work (COMPAT-2), set with `pmx vendor --require`, and whether
+   * every machine's background job installs the team's version by itself (COMPAT-6, `--auto-update`).
+   */
+  cli?: { min: string; autoUpdate?: boolean } | null;
   company?: { teams: { name: string; teamKey: string; projectId: string }[]; machine: string | null } | null;
 }
 

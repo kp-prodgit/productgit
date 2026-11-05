@@ -14,7 +14,8 @@ import { runStatus } from "./status.js";
 import { digestStep, runTick, type TickStep } from "./tick.js";
 import { runUninstall } from "./uninstall.js";
 import { VENDORED_CLI, vendorCli } from "../core/vendor.js";
-import { atLeast, compareVersions, currentVersion, vendoredVersion } from "../core/version.js";
+import { atLeast, currentVersion, vendoredVersion } from "../core/version.js";
+import { installTeamVersion, type UpdateOutcome } from "../core/update.js";
 import { Git } from "../core/git.js";
 import { loadState } from "../core/state.js";
 import { writeJson } from "../core/fsutil.js";
@@ -29,6 +30,7 @@ import { pullStep, releaseStep, synthStep, teamCommands } from "./team.js";
 import { reviewCommand } from "./review.js";
 import { cloudCommands } from "./cloud.js";
 import { companyStep, meetingCommands, todoStep } from "./meetings.js";
+import { updateStep } from "./autoupdate.js";
 import { syncAnalytics } from "../cloud/account.js";
 
 export interface RunArgs {
@@ -51,6 +53,8 @@ const yes = { yes: { type: "boolean", short: "y" } } as const;
 
 /** Steps `pmx tick` runs, in order. Later milestones add synthesis and pull. */
 export const tickSteps: [string, TickStep][] = [
+  // First, so the rest of a pass never runs on a version the team has moved past (COMPAT-6).
+  ["update", updateStep],
   ["digest", digestStep],
   ["todo", todoStep],
   ["release", releaseStep],
@@ -163,17 +167,19 @@ export const commands: Command[] = [
   {
     name: "vendor",
     summary: "Put this CLI's package in the PMX repo, so teammates and CI install the same version; --require makes it the team minimum",
-    usage: "pmx vendor [--require] [--repo <PMX repo path>]",
-    options: { repo: { type: "string" }, require: { type: "boolean" } },
+    usage: "pmx vendor [--require [--auto-update | --no-auto-update]] [--repo <PMX repo path>]",
+    options: { repo: { type: "string" }, require: { type: "boolean" }, "auto-update": { type: "boolean" }, "no-auto-update": { type: "boolean" } },
     async run(a) {
       const repo = a.values.repo ?? (await loadPersonalConfig()).repoPath;
       const version = await vendorCli(repo, exec);
       if (a.values.require) {
         const file = join(repo, TEAM_CONFIG_FILE);
         const raw = (await readJson<Record<string, unknown>>(file)) ?? {};
-        await writeJson(file, { ...raw, cli: { min: version } }, 0o644);
+        const prev = (raw.cli ?? {}) as { autoUpdate?: boolean };
+        const autoUpdate = a.values["auto-update"] ? true : a.values["no-auto-update"] ? false : prev.autoUpdate;
+        await writeJson(file, { ...raw, cli: { min: version, ...(autoUpdate !== undefined ? { autoUpdate } : {}) } }, 0o644);
       }
-      console.log(`Wrote ${VENDORED_CLI} (productgit ${version}) in ${repo}.${a.values.require ? `\nSet cli.min to ${version} in ${TEAM_CONFIG_FILE}: older machines keep personal work but stop shared team work until they run \`pmx update\`.` : ""}
+      console.log(`Wrote ${VENDORED_CLI} (productgit ${version}) in ${repo}.${a.values.require ? `\nSet cli.min to ${version} in ${TEAM_CONFIG_FILE}: older machines keep personal work but stop shared team work until they run \`pmx update\`.${a.values["auto-update"] ? " Auto-update is on: each machine's background job installs it within the hour." : ""}` : ""}
 Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates update with \`pmx update\`.`);
       return 0;
     },
@@ -204,24 +210,17 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
         ...(cloud?.latest ? [`Latest release: pmx ${cloud.latest}`] : []),
       ].join("\n"));
       if (a.values.check) return min && !atLeast(current, min) ? 1 : 0;
-      if (!vendored) {
-        console.log(`\nAsk your team lead to run \`pmx vendor --require\` and commit it.`);
-        return 1;
-      }
-      if ((compareVersions(vendored, current) ?? 0) <= 0 && !a.values.force) {
-        console.log("\nUp to date.");
-        return 0;
-      }
-      const r = await exec("npm", ["install", "-g", tgz], { timeoutMs: 300000 });
-      if (r.code !== 0) {
-        const perm = /EACCES|permission denied/i.test(r.stderr);
-        console.error(perm
-          ? `\nnpm can't write to its global folder. Run:\n  sudo npm install -g "${tgz}"\nor install Node with Homebrew or nvm so global installs don't need sudo.`
-          : `\nnpm install failed: ${r.stderr.trim().split("\n").slice(-3).join(" ")}`);
-        return 1;
-      }
-      console.log(`\nUpdated to pmx ${vendored}. The background job uses it from its next pass.`);
-      return 0;
+      const r = await installTeamVersion(repo, exec, { force: a.values.force });
+      const say: Record<UpdateOutcome["result"], string> = {
+        "no-package": "\nAsk your team lead to run `pmx vendor --require` and commit it.",
+        current: "\nUp to date.",
+        updated: `\nUpdated to pmx ${vendored}. The background job uses it from its next pass.`,
+        "dev-install": "\nThis pmx runs from a source checkout, so it isn't replaced. Pull and rebuild the checkout instead.",
+        "needs-sudo": `\nnpm can't write to its global folder. Run:\n  ${r.result === "needs-sudo" ? r.command : ""}\nor install Node with Homebrew or nvm, so updates (and auto-updates) don't need sudo.`,
+        failed: `\nnpm install failed: ${r.result === "failed" ? r.error : ""}`,
+      };
+      console.log(say[r.result]);
+      return r.result === "current" || r.result === "updated" ? 0 : 1;
     },
   },
   ...meetingCommands,

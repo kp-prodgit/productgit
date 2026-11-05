@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "handle": "ana",
+  "machineId": "m1",
+  "repoPath": "/tmp/pmx-compat-repo",
+  "installedAt": "2026-11-01T00:00:00.000Z",
+  "plan": "max",
+  "categories": [
+    "research-synthesis",
+    "spec"
+  ],
+  "workingHours": {
+    "days": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "start": "09:00",
+    "end": "18:00"
+  },
+  "budget": {
+    "dailyUsd": 5,
+    "resetHour": 0,
+    "overrideUsd": null
+  },
+  "sources": {
+    "transcriptDirs": [
+      "/tmp/pmx-compat-calls"
+    ],
+    "slackChannel": null
+  },
+  "neverIngest": {
+    "people": [],
+    "channels": [],
+    "meetingTitles": []
+  },
+  "crmNamesFile": null,
+  "digest": {
+    "weekday": 5,
+    "slackDmUserId": null
+  },
+  "cloud": {
+    "url": "https://api.productgit.com/v1",
+    "orgId": "org_abc"
+  },
+  "analytics": {
+    "enabled": true,
+    "decidedAt": "2026-11-05T10:00:00.000Z"
+  },
+  "identity": {
+    "names": [
+      "Ana Lee"
+    ],
+    "emails": [
+      "ana@example.com"
+    ]
+  }
+}

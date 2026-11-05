@@ -70,7 +70,15 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const vendored = await vendoredVersion(join(repo, VENDORED_CLI), d.exec);
   add("cli.team-package", !vendored || !((compareVersions(vendored, current) ?? 0) > 0),
     vendored ? `team package is pmx ${vendored}${(compareVersions(vendored, current) ?? 0) > 0 ? ": run `pmx update`" : ""}` : `no CLI package in the PMX repo (\`pmx vendor\`)`, "warn");
-  const cloud = (await loadState()).cloudVersions;
+  const st = await loadState();
+  if (d.team.cli?.autoUpdate) {
+    const au = st.autoUpdate;
+    const stuck = au && (au.result === "needs-sudo" || au.result === "failed");
+    add("cli.auto-update", !stuck, au
+      ? `auto-update on; last check ${au.checkedAt.slice(0, 16).replace("T", " ")}: ${stuck ? `pmx ${au.version} is waiting, run \`pmx update\`` : au.result === "dev-install" ? "source checkout, not replaced" : au.result}`
+      : "auto-update on; the background job hasn't checked yet", "warn");
+  }
+  const cloud = st.cloudVersions;
   if (cloud?.latest) add("cli.latest", (compareVersions(cloud.latest, current) ?? 0) <= 0, `latest release is pmx ${cloud.latest}`, "warn");
 
   const loose: string[] = [];

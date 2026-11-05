@@ -1,0 +1,25 @@
+{
+  "v": 1,
+  "processed": {
+    "m0123456789abcdef": "2026-11-05T17:31:00.000Z"
+  },
+  "items": [
+    {
+      "id": "a1b2c3",
+      "text": "Send Sam the pricing sheet",
+      "due": "2026-11-07",
+      "why": "Sam asked and you agreed.",
+      "source": {
+        "title": "Ana / Sam 1:1",
+        "at": "2026-11-05",
+        "keys": [
+          "m0123456789abcdef"
+        ]
+      },
+      "status": "open",
+      "createdAt": "2026-11-05T17:31:00.000Z",
+      "doneAt": null,
+      "receiptId": "todo-20261105T173100Z"
+    }
+  ]
+}

@@ -15,9 +15,11 @@ export interface State {
   lastRollupAt: string | null;
   /** What the hosted app last said about CLI versions (COMPAT-5). */
   cloudVersions: { latest: string | null; min: string | null; seenAt: string } | null;
+  /** The background auto-update (COMPAT-6): when it last looked, and what last happened. */
+  autoUpdate: { checkedAt: string; result: string; version: string | null; notifiedFor: string | null } | null;
 }
 
-const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null, cloudVersions: null };
+const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null, cloudVersions: null, autoUpdate: null };
 
 export async function loadState(): Promise<State> {
   return { ...EMPTY, ...((await readJson<Partial<State>>(paths.state())) ?? {}) };
