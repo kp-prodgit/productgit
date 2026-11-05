@@ -11,7 +11,7 @@ export class CloudError extends Error {
   }
 }
 
-/** Client for the hosted app's API (docs/05-control-plane-api.md). Free and paid plans share it. Sends IDs and counts only (SCOPE-8). */
+/** Client for the hosted app's API (docs/control-plane-api.md). Free and paid plans share it. Sends IDs and counts only (SCOPE-8). */
 export class Cloud {
   constructor(readonly url: string, private readonly keychain: Keychain, private readonly f: Fetch = fetch) {}
 

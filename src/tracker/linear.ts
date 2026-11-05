@@ -5,7 +5,7 @@ import { meetingDescription, type MeetingEntry, type NewTask, type Tracker } fro
 /**
  * Linear adapter (SCOPE-1). PMX fields are label groups, not custom fields, so no Linear admin
  * is needed (TASK-6). The mapping is shared with the control plane's canvas proxy
- * (docs/05-control-plane-api.md).
+ * (docs/control-plane-api.md).
  */
 export const GROUPS = { status: "pmx-status", category: "pmx-category", size: "pmx-size", agent: "pmx-agent", kind: "pmx-kind" } as const;
 type Group = keyof typeof GROUPS;

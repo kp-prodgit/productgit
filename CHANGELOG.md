@@ -14,7 +14,7 @@ Everything since 0.4.0, which shipped several times under that number:
 
 ## 0.4.0 (M5): control plane client, canvas and managed settings
 
-Team-plan features in `ee/` (commercial license), against the API in `docs/05-control-plane-api.md`:
+Team-plan features in `ee/` (commercial license), against the API in `docs/control-plane-api.md`:
 
 - `pmx login`: browser sign-in through the control plane; the machine token goes to the keychain. `init --invite` joins the org in the same browser trip.
 - Admin policy (ADMIN-2): applied as an intersection with team config (categories, sources, egress, model, review cap). Runs stop on a disallowed model plan. Cached for an hour; fails closed after 7 days without the server.
