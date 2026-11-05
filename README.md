@@ -35,7 +35,10 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `status` | Config, kill switch, spend and recent runs |
 | `explain` | How a run decided: what was found, used, left out, cut and masked, which skills and model ran, why each task got its size, and the cost. `--web` opens a local page |
 | `skills` | The Claude skills PMX can use, what each does, when it runs, and whether your team's copy differs from the built-in one |
-| `synthesize` | Team sources → sized tasks in the Linear PMX inbox (a human triages) |
+| `collect` | Meeting transcripts from your Claude connectors (Granola, Fireflies…): `--prompt` prints the scheduled task's instructions, `--check` validates what it saved |
+| `todo` | Your own to-dos from your meetings, including 1:1s; never leaves your Mac. `--refresh` reads today's unread meetings, `done <id>` checks one off |
+| `synthesize` | Today's unprocessed team meetings (and Slack) → sized tasks in the Linear PMX inbox; each meeting is lodged in Linear and marked done so it's never processed twice |
+| `company` | Roll teams' PMX tasks up into company-level themes; reads tasks, never transcripts |
 | `pull` | Claim the best ready task that fits budget, hours and the review cap, and run it (dry run in week one) |
 | `claim` / `release` | Claim a specific task; give one back; `--stale` releases expired claims |
 | `verify-record` | CI check: every output PR carries a clean run record |
@@ -69,6 +72,7 @@ The brain runs on one of your team's machines on your own Claude plan, so task t
 - **Atomic claims.** A claim is a parentless commit pushed to `refs/pmx/claims/<task>`; only one push can win.
 - **Provable runs (B5, NEUT-3).** Each output PR carries `.pmx/runs/<task>.json`. CI recomputes the environment fingerprint from the repo and rejects records that don't match.
 - **Explainable runs (PRIV-4).** Every digest and synthesis run leaves a receipt in `~/.pmx/receipts` (owner-only, 14 days, never in git). `pmx explain` shows it; left-out text is never stored, and file names and lines are found again in your own folders on screen.
+- **Meetings, once.** A scheduled task in your Claude app copies transcripts from your meeting connectors; PMX's own runs never get connectors. Team meetings are claimed and lodged in Linear, then marked done with the tasks they produced, so no meeting is processed twice. Your own to-dos may come from 1:1s, but stay on your Mac.
 - **Content-free analytics (PRIV-5).** Only after `pmx login`, and only IDs, sizes, outcomes, counts and cost. `pmx analytics --show` prints exactly what's waiting; `pmx analytics off` stops it.
 - **Audit.** The run log is `runs/YYYY-MM.jsonl` on the `pmx/runlog` branch, hash-chained per agent and checked by `pmx doctor`.
 

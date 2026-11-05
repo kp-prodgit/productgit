@@ -11,11 +11,15 @@ import { updateState } from "../core/state.js";
 import { SIZES, type CandidateTask, type SignalItem, type Size } from "../core/types.js";
 import { recordSpend } from "../budget/provider.js";
 import { gather } from "../digest/gather.js";
+import { planMeetings, startOfDay } from "../meetings/ledger.js";
+import type { MeetingEntry } from "../tracker/types.js";
 
 export interface SynthResult {
   posted: { identifier: string; title: string }[];
   skipped: string[];
   held: number;
+  /** The meeting ledger (MEET-2): lodged and finished now, already done by someone, claimed elsewhere, before the window. */
+  meetings: { processed: { entry: string; tasks: string[] }[]; already: number; busy: number; before: number };
 }
 
 /** Model output derived from source text stays on one line, so it can never start a `pmx:` control line. */
@@ -94,15 +98,55 @@ export function describe(c: CandidateTask, items: SignalItem[]): string {
  * `pmx synthesize` (SIG-2, SIG-4). Reads team sources with no tools, proposes sized tasks and
  * posts them to the PMX project's inbox only. A human triages before anything runs (SEC-2).
  */
-export async function synthesize(ctx: Ctx, svc: Services, o: { days: number; dryRun?: boolean }): Promise<SynthResult> {
+export async function synthesize(
+  ctx: Ctx, svc: Services,
+  o: { days: number; dryRun?: boolean; since?: Date; skipIfNothingNew?: boolean },
+): Promise<SynthResult> {
   const g = await gather(ctx, { days: o.days, scope: "team" });
+  // Without `since`, the whole `days` window counts; the CLI and the polling step pass `since` (MEET-3).
+  const since = o.since ?? startOfDay(ctx.now(), o.days);
   const receipt: RunReceipt = {
     v: 1, id: newReceiptId("synthesize", ctx.now()), type: "synthesize", at: ctx.now().toISOString(), agent: ctx.agent, dryRun: !!o.dryRun,
     outcome: "no-signal", ...g.receipt, skills: [], model: null,
   };
-  if (!g.items.length) {
+  const result0: SynthResult = { posted: [], skipped: [], held: totalHeld(g.held), meetings: { processed: [], already: 0, busy: 0, before: 0 } };
+
+  // The team's meeting ledger (MEET-2): skip meetings someone already processed, claim the rest.
+  const plan = planMeetings(g.items, await svc.tracker.listMeetings(), since);
+  const mark = (item: SignalItem, state: NonNullable<RunReceipt["sources"][number]["ledger"]>["state"], entry: string | null) => {
+    const src = receipt.sources.find((x) => x.id === item.id);
+    if (src) src.ledger = { state, entry };
+  };
+  for (const a of plan.already) mark(a.item, "already-processed", a.entry.identifier);
+  for (const b of plan.before) mark(b, "before-window", null);
+  result0.meetings.already = plan.already.length;
+  result0.meetings.before = plan.before.length;
+
+  const lodged: { item: SignalItem; entry: MeetingEntry; lease: string }[] = [];
+  if (o.dryRun) for (const f of plan.fresh) mark(f.item, "would-process", f.entry?.identifier ?? null);
+  else {
+    for (const f of plan.fresh) {
+      const lease = `meeting-${f.item.keys![0]}`;
+      const got = await svc.lease.acquire(lease, ctx.agent, 1800);
+      if (!got.ok) {
+        mark(f.item, "in-progress-elsewhere", f.entry?.identifier ?? null);
+        result0.meetings.busy++;
+        continue;
+      }
+      const entry = f.entry ?? (await svc.tracker.lodgeMeeting({
+        title: f.item.title, keys: f.item.keys!, at: f.item.at.slice(0, 10), source: f.item.origin?.source ?? "transcript file", agent: ctx.agent,
+      }));
+      mark(f.item, "processed-now", entry.identifier);
+      lodged.push({ item: f.item, entry, lease });
+    }
+  }
+  const work = [...plan.other, ...(o.dryRun ? plan.fresh.map((f) => f.item) : lodged.map((l) => l.item))];
+  const release = async () => { for (const l of lodged) await svc.lease.release(l.lease, ctx.agent).catch(() => false); };
+  // Polling (MEET-3): with nothing new, no model call and no receipt.
+  if (o.skipIfNothingNew && !lodged.length && !(o.dryRun && plan.fresh.length)) return result0;
+  if (!work.length) {
     await writeReceipt(receipt, ctx.now());
-    return { posted: [], skipped: [], held: totalHeld(g.held) };
+    return result0;
   }
 
   const [synthName, sizeName] = SKILL_USES.synthesize;
@@ -113,7 +157,7 @@ export async function synthesize(ctx: Ctx, svc: Services, o: { days: number; dry
     { name: sizeName, version: rubric.version, source: rubric.source },
   ];
   const categories = Object.keys(ctx.team.categories);
-  const { tag, block } = dataBlock(g.items);
+  const { tag, block } = dataBlock(work);
   const prompt = [
     skillBody(synth.text),
     "",
@@ -134,19 +178,34 @@ export async function synthesize(ctx: Ctx, svc: Services, o: { days: number; dry
   };
   if (!result.ok) {
     await writeReceipt({ ...receipt, outcome: "failed", error: result.error ?? "unknown" }, ctx.now());
+    for (const l of lodged) await svc.tracker.finishMeeting(l.entry.id, { status: "blocked", tasks: [], note: `PMX couldn't process this meeting (${result.error ?? "the run failed"}). The next pass retries it.` }).catch(() => {});
+    await release();
     throw new Error(`Synthesis run failed: ${result.error ?? "unknown"}`);
   }
 
-  const { tasks, skipped } = parseCandidates(result.text, categories, new Set(g.items.map((i) => i.id)), parseRubric(rubric.text));
+  const { tasks, skipped } = parseCandidates(result.text, categories, new Set(work.map((i) => i.id)), parseRubric(rubric.text));
   const existing = new Set((await svc.tracker.list()).filter((t) => t.status !== "done").map((t) => norm(t.title)));
   const posted: SynthResult["posted"] = [];
+  const bySource = new Map<string, string[]>();
   for (const c of tasks) {
     if (existing.has(norm(c.title))) { skipped.push(`${c.title}: already in the PMX project`); continue; }
     if (o.dryRun) { posted.push({ identifier: "(dry run)", title: c.title }); continue; }
-    const t = await svc.tracker.createInbox({ title: c.title, description: describe(c, g.items), category: c.category, size: c.size, sources: c.sources });
+    const t = await svc.tracker.createInbox({ title: c.title, description: describe(c, work), category: c.category, size: c.size, sources: c.sources });
     posted.push({ identifier: t.identifier, title: t.title });
+    for (const id of c.sources) bySource.set(id, [...(bySource.get(id) ?? []), t.identifier]);
     existing.add(norm(c.title));
   }
+  // Mark each lodged meeting complete in the tracker, with the tasks it produced (MEET-2).
+  for (const l of lodged) {
+    const made = bySource.get(l.item.id) ?? [];
+    await svc.tracker.finishMeeting(l.entry.id, {
+      status: "done", tasks: made,
+      note: made.length ? `PMX processed this meeting: ${made.length} suggested task(s), ${made.join(", ")}. See why with \`pmx explain ${receipt.id}\` on ${ctx.agent}.` : "PMX processed this meeting: nothing in it fits a PMX task.",
+    });
+    result0.meetings.processed.push({ entry: l.entry.identifier, tasks: made });
+  }
+  await release();
+
   receipt.outcome = o.dryRun ? "dry-run" : "posted";
   receipt.synth = { tasks: tasks.map((c) => ({ title: c.title, category: c.category, size: c.size, sources: c.sources, sizing: c.sizing ?? null })), skipped };
   await writeReceipt(receipt, ctx.now());
@@ -157,5 +216,5 @@ export async function synthesize(ctx: Ctx, svc: Services, o: { days: number; dry
       durationMs: result.durationMs, tokens: result.tokens, costUsd: result.costUsd,
     });
   }
-  return { posted, skipped, held: totalHeld(g.held) };
+  return { ...result0, posted, skipped };
 }

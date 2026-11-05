@@ -33,6 +33,10 @@ export interface SignalItem {
   at: string;
   participants: string[];
   text: string;
+  /** Meeting identity hashes (MEET-1), worked out before redaction. Only hashes, never names. */
+  keys?: string[];
+  /** Where a connector-collected transcript came from (COLLECT-1), e.g. granola + its note ID. */
+  origin?: { source: string; sourceId: string | null };
 }
 
 export interface CandidateTask {

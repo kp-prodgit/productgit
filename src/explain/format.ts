@@ -14,6 +14,15 @@ const MASK_NAMES: Record<RedactionKind, [string, string]> = {
   person: ["customer name", "customer names"],
 };
 
+/** Where a meeting stood in the meeting ledger (MEET-2) or the PM's to-do record (TODO-3). */
+export const LEDGER: Record<NonNullable<RunReceipt["sources"][number]["ledger"]>["state"], string> = {
+  "processed-now": "Processed in this run",
+  "would-process": "Would be processed (dry run)",
+  "already-processed": "Skipped: already processed",
+  "in-progress-elsewhere": "Skipped: another machine is processing it",
+  "before-window": "Skipped: before this run's start date",
+};
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const tilde = (p: string) => p.replace(homedir(), "~");
 const money = (n: number | null) => (n === null ? "cost unknown" : `$${n.toFixed(2)}`);
@@ -41,16 +50,17 @@ export function receiptSummary(r: RunReceipt): string {
 /** The full receipt for the terminal: every source, the rule that decided it, what Claude got. */
 export function formatReceipt(r: RunReceipt, live: LiveSource[]): string {
   const when = new Date(r.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-  const title = r.type === "digest" ? "Digest" : r.dryRun ? "Suggested tasks (dry run)" : "Suggested tasks";
+  const title = r.type === "digest" ? "Digest" : r.type === "todo" ? `Your to-dos${r.dryRun ? " (dry run)" : ""}` : r.dryRun ? "Suggested tasks (dry run)" : "Suggested tasks";
   const out = [`${title} · ${when} · ${r.outcome}`, ""];
   const where = r.rules.folders.length ? r.rules.folders.map(tilde).join(", ") : "your sources";
   out.push(`1. Found ${plural(r.sources.length, "conversation")} in ${where} from the last ${r.window.days} days`);
   for (const s of r.skippedSources) out.push(`   - skipped: ${s}`);
   out.push("", "2. Privacy rules decided what Claude may read");
+  if (r.rules.allowOneOnOne) out.push("   Your own to-dos: internal meetings and 1:1s are allowed, because the result stays on this Mac. Health, pay and performance passages are still cut.");
   r.sources.forEach((s, i) => {
     const l = live[i];
     const name = s.file ?? l?.file ?? (s.kind === "slack" ? "a Slack message" : "a file that's no longer in your folder");
-    if (s.decision === "used") out.push(`   ✔ used      [${s.id}] ${name}: ${s.detail}`);
+    if (s.decision === "used") out.push(`   ✔ used      [${s.id}] ${name}: ${s.detail}${s.ledger ? `. ${LEDGER[s.ledger.state]}${s.ledger.entry ? ` (${s.ledger.entry})` : ""}` : ""}`);
     else out.push(`   ✘ left out  ${name}: ${HOLD_LABELS[s.rule!]}, because ${s.detail}`);
     (l?.cuts ?? s.passagesCut.map((c) => ({ rule: c.rule, line: null, matched: null }))).forEach((c) => {
       const at = c.line ? `line ${c.line}` : "a passage";
@@ -76,6 +86,11 @@ export function formatReceipt(r: RunReceipt, live: LiveSource[]): string {
       }
     }
     for (const s of r.synth.skipped) out.push(`   skipped: ${s}`);
+  }
+  if (r.todo) {
+    out.push("", `5. ${plural(r.todo.added.length, "new to-do")}${r.todo.duplicates ? `, ${r.todo.duplicates} already on your list` : ""}. They stay on this Mac (\`pmx todo\`):`);
+    for (const t of r.todo.added) out.push(`   ☐ ${t.text}${t.due ? ` (due ${t.due})` : ""}  [${t.source}]`);
+    for (const d of r.todo.dropped) out.push(`   dropped: ${d}`);
   }
   if (r.error) out.push("", `The run failed: ${r.error}`);
   out.push("", "Left-out text is never stored. File names and lines above were found just now in your own folders.");

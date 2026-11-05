@@ -19,15 +19,17 @@ import type { Size } from "./types.js";
 export interface RunReceipt {
   v: 1;
   id: string;
-  type: "digest" | "synthesize";
+  type: "digest" | "synthesize" | "todo";
   at: string;
   agent: string;
   dryRun?: boolean;
   outcome: "staged" | "no-signal" | "failed" | "posted" | "dry-run";
-  window: { days: number; since: string; scope: "personal" | "team" };
+  window: { days: number; since: string; scope: "personal" | "team" | "individual" };
   rules: {
     internalDomains: string[];
     requireExternalParticipant: boolean;
+    /** Individual to-dos only: 1:1s and internal meetings were allowed (TODO-2). */
+    allowOneOnOne?: boolean;
     topicRulesHash: string;
     /** How many entries each do-not-read list has. Never the entries. */
     neverIngest: { people: number; channels: number; meetingTitles: number };
@@ -41,6 +43,8 @@ export interface RunReceipt {
   model: { name: string; runtime: string; tools: string; costUsd: number | null; tokens: number | null; durationMs: number; promptSha256: string } | null;
   digest?: { cited: string[]; removedClaims: number; staged: string };
   synth?: { tasks: TaskReceipt[]; skipped: string[] };
+  /** Individual to-dos (TODO-1): what was added, and from which used source. Stays on this Mac. */
+  todo?: { added: { text: string; source: string; due: string | null }[]; duplicates: number; dropped: string[] };
   error?: string;
 }
 
@@ -58,6 +62,8 @@ export interface SourceReceipt {
   detail: string;
   passagesCut: { rule: HoldReason; hash: string }[];
   passagesUsed: number;
+  /** Team runs: where this meeting stood in the team's meeting ledger (MEET-2). */
+  ledger?: { state: "processed-now" | "already-processed" | "in-progress-elsewhere" | "before-window" | "would-process"; entry: string | null };
 }
 
 export interface TaskReceipt {
@@ -97,7 +103,7 @@ export function newReceiptId(type: RunReceipt["type"], at: Date): string {
   return `${type}-${at.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
 }
 
-const ID = /^(digest|synthesize)-\d{8}T\d{6}Z$/;
+const ID = /^(digest|synthesize|todo)-\d{8}T\d{6}Z$/;
 const KEEP_DAYS = 14;
 const KEEP_MAX = 50;
 

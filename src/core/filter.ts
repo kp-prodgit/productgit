@@ -74,6 +74,11 @@ export interface FilterRules {
   /** Transcripts need an external participant (B2). Slack items skip this check. */
   requireExternalParticipant: boolean;
   neverIngest: { people: string[]; channels: string[]; meetingTitles: string[] };
+  /**
+   * Individual scope only (TODO-2): the PM's own 1:1s and internal meetings may be read, because the
+   * result never leaves their Mac. Performance, pay and health passages are still cut.
+   */
+  allowOneOnOne?: boolean;
 }
 
 /** Why one source was used or left out. Holds name the rule; passages are hashes, never text. */
@@ -115,7 +120,7 @@ export function itemHoldReason(item: SignalItem, r: FilterRules): HoldReason | n
 
 export function itemDecision(item: SignalItem, r: FilterRules): { reason: HoldReason | null; detail: string } {
   const ni = r.neverIngest;
-  if (TOPICS["one-on-one"].test(item.title)) return { reason: "one-on-one", detail: "the title looks like a 1:1 or career talk" };
+  if (!r.allowOneOnOne && TOPICS["one-on-one"].test(item.title)) return { reason: "one-on-one", detail: "the title looks like a 1:1 or career talk" };
   if (ni.meetingTitles.some((t) => lc(item.title).includes(lc(t)))) return { reason: "never-ingest", detail: "the title matches your do-not-read list" };
   if (ni.channels.some((c) => lc(c).replace(/^#/, "") === lc(item.ref).replace(/^#/, "") || lc(item.title) === lc(c).replace(/^#/, "")))
     return { reason: "never-ingest", detail: "the channel is on your do-not-read list" };
@@ -148,6 +153,7 @@ export function screenText(text: string, r: FilterRules, counts: Record<HoldReas
   for (const seg of segments(text)) {
     let reason: HoldReason | null = null;
     for (const [topic, re] of Object.entries(TOPICS) as [Topic, RegExp][]) {
+      if (topic === "one-on-one" && r.allowOneOnOne) continue;
       if (re.test(seg)) {
         reason = topic;
         break;

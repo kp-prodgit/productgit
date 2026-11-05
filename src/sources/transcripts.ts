@@ -10,6 +10,10 @@ export interface ParsedTranscript {
   date: string | null;
   participants: string[];
   body: string;
+  /** Set by `pmx collect` front matter (COLLECT-1). */
+  source: string | null;
+  sourceId: string | null;
+  owner: string | null;
 }
 
 const splitList = (s: string) =>
@@ -25,7 +29,7 @@ export function parseTranscript(raw: string, fallbackTitle: string): ParsedTrans
   const header = fm ? fm[1]! : body.split(/\n\s*\n/, 1)[0] ?? "";
   const fields = new Map<string, string>();
   for (const line of header.split("\n")) {
-    const m = line.match(/^\s*(title|date|participants|attendees)\s*:\s*(.+)$/i);
+    const m = line.match(/^\s*(title|date|participants|attendees|source|source_id|owner)\s*:\s*(.+)$/i);
     if (m) fields.set(m[1]!.toLowerCase(), m[2]!.trim());
   }
   if (fields.size) {
@@ -41,7 +45,11 @@ export function parseTranscript(raw: string, fallbackTitle: string): ParsedTrans
     .replace(/^\d{2}:\d{2}:\d{2}[.,]\d{3} --> .*$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return { title: title.replace(/^["']|["']$/g, ""), date, participants, body };
+  const clean = (v: string | undefined) => (v ? v.replace(/^["']|["']$/g, "").trim() || null : null);
+  return {
+    title: title.replace(/^["']|["']$/g, ""), date, participants, body,
+    source: clean(fields.get("source"))?.toLowerCase() ?? null, sourceId: clean(fields.get("source_id")), owner: clean(fields.get("owner")),
+  };
 }
 
 export interface TranscriptOpts {
@@ -75,6 +83,7 @@ export async function readTranscripts(o: TranscriptOpts): Promise<SignalItem[]> 
         at: p.date ?? new Date(s.mtimeMs).toISOString().slice(0, 10),
         participants: p.participants,
         text: p.body,
+        ...(p.source ? { origin: { source: p.source, sourceId: p.sourceId } } : {}),
       });
     }
   }

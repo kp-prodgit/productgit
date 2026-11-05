@@ -239,5 +239,6 @@ Shared by the CLI adapter and the canvas proxy. Each is a Linear **label group**
 | `pmx-category` | one per category, e.g. `research-synthesis` |
 | `pmx-size` | `S`, `M`, `L`, `XL` |
 | `pmx-agent` | the agent handle that claimed it (created on demand) |
+| `pmx-kind` | `meeting`: a lodged team meeting in the meeting ledger (MEET-2), not a task. Its description has one `pmx:meeting <hash>` line per meeting identity and one `pmx:task <ID>` line per task it produced; when processed it gets `pmx-status: done` and the team's completed workflow state. The canvas proxy, pull and the brain skip it. |
 
 The PR link is the last `pmx:pr <url>` line in the issue's comments. Sources are `pmx:source <id>` lines in the description.

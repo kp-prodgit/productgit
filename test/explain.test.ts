@@ -133,7 +133,7 @@ describe("skills inventory", () => {
     const spec = await readFile(join(bundledSkillsDir(), "pmx-spec", "SKILL.md"), "utf8");
     await writeFile(join(repo, ".claude", "skills", "pmx-spec", "SKILL.md"), spec + "\nAlways add a risks section.\n");
     const skills = await skillInventory(repo, DEFAULT_TEAM.categories);
-    expect(skills.map((s) => s.name)).toEqual(["pmx-brain", "pmx-competitive", "pmx-digest", "pmx-hygiene", "pmx-pull", "pmx-research", "pmx-size", "pmx-spec", "pmx-synthesize"]);
+    expect(skills.map((s) => s.name)).toEqual(["pmx-brain", "pmx-competitive", "pmx-digest", "pmx-hygiene", "pmx-pull", "pmx-research", "pmx-rollup", "pmx-size", "pmx-spec", "pmx-synthesize", "pmx-todo"]);
     const by = Object.fromEntries(skills.map((s) => [s.name, s]));
     expect(by["pmx-spec"]).toMatchObject({ status: "differs from built-in", runs: "team", category: "spec", usedBy: "`pmx pull`: drafts spec tasks" });
     expect(by["pmx-digest"]!.usedBy).toMatch(/pmx digest/);
@@ -175,7 +175,7 @@ describe("pmx explain --web (PRIV-4, SEC)", () => {
       expect((await get(s.port, "/api/runs", auth, "POST")).status).toBe(405);
       expect((await get(s.port, "/api/runs/..%2f..%2fconfig", auth)).status).toBe(404);
       expect(JSON.parse((await get(s.port, "/api/runs", auth)).body)).toEqual({ runs: [] });
-      expect(JSON.parse((await get(s.port, "/api/skills", auth)).body).skills).toHaveLength(9);
+      expect(JSON.parse((await get(s.port, "/api/skills", auth)).body).skills).toHaveLength(11);
       const sizing = JSON.parse((await get(s.port, "/api/sizing", auth)).body);
       expect(sizing.rubric.cells.spec.M).toBe("One-pager");
       expect(JSON.parse((await get(s.port, "/api/rules", auth)).body).topics.health.examples).toContain("medical");

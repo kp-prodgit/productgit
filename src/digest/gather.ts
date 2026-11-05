@@ -6,6 +6,7 @@ import { sourceReceipts, topicRulesHash, type RunReceipt } from "../core/receipt
 import type { SignalItem } from "../core/types.js";
 import { readSlack } from "../sources/slack.js";
 import { readTranscripts } from "../sources/transcripts.js";
+import { meetingKeys } from "../meetings/ledger.js";
 
 export interface Gathered {
   items: SignalItem[];
@@ -21,8 +22,10 @@ export interface Gathered {
  * Nothing here is written to disk: held material is dropped in memory.
  *
  * `scope` "personal" reads the PM's own folders (digest). "team" adds team-approved channels (synthesis, M3).
+ * "individual" reads the PM's own folders for their private to-dos (TODO-2): internal meetings and 1:1s
+ * are allowed there, because nothing it produces leaves the Mac.
  */
-export async function gather(ctx: Ctx, o: { days: number; scope: "personal" | "team" }): Promise<Gathered> {
+export async function gather(ctx: Ctx, o: { days: number; scope: "personal" | "team" | "individual" }): Promise<Gathered> {
   const { team, personal } = ctx;
   const sinceMs = ctx.now().getTime() - o.days * 86400000;
   const raw: SignalItem[] = [];
@@ -51,7 +54,10 @@ export async function gather(ctx: Ctx, o: { days: number; scope: "personal" | "t
     }
   }
 
-  const rules = { internalDomains: team.internalDomains, requireExternalParticipant: true, neverIngest: personal.neverIngest };
+  // Meeting identities come from participants and IDs, so they're worked out before redaction (MEET-1).
+  for (const it of raw) if (it.kind === "transcript") it.keys = meetingKeys(it);
+  const individual = o.scope === "individual";
+  const rules = { internalDomains: team.internalDomains, requireExternalParticipant: !individual, neverIngest: personal.neverIngest, allowOneOnOne: individual };
   const filtered = filterItems(raw, rules);
 
   const names = personal.crmNamesFile ? (await readFile(personal.crmNamesFile, "utf8").catch(() => "")).split("\n") : [];
@@ -64,7 +70,7 @@ export async function gather(ctx: Ctx, o: { days: number; scope: "personal" | "t
     receipt: {
       window: { days: o.days, since: new Date(sinceMs).toISOString(), scope: o.scope },
       rules: {
-        internalDomains: team.internalDomains, requireExternalParticipant: true, topicRulesHash: topicRulesHash(),
+        internalDomains: team.internalDomains, requireExternalParticipant: !individual, ...(individual ? { allowOneOnOne: true } : {}), topicRulesHash: topicRulesHash(),
         neverIngest: { people: personal.neverIngest.people.length, channels: personal.neverIngest.channels.length, meetingTitles: personal.neverIngest.meetingTitles.length },
         folders: team.allowedSources.includes("transcripts") ? personal.sources.transcriptDirs : [],
       },

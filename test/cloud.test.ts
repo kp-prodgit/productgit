@@ -82,6 +82,7 @@ describe("built-in analytics (PRIV-5, SCOPE-8)", () => {
     expect(e).toEqual({ type: "pipeline", id: expect.stringMatching(/^[0-9a-f]{32}$/), at: "2026-11-05T02:00:00.000Z", kind: "digest", outcome: "staged", found: 2, used: 1, cut: 1, costUsd: 0.02, agent: "ana@m1" });
     expect(JSON.stringify(e)).not.toMatch(/northfield|Northfield|calls|internal|acme/i);
     expect(pipelineEvents([receipt()], "2026-11-05T02:00:00.000Z")).toEqual([]);
+    expect(pipelineEvents([receipt({ type: "todo", id: "todo-20261105T020000Z" })], null)).toEqual([]);
   });
 
   it("sends nothing until the PM signed in and left analytics on, then sends each event once", async () => {

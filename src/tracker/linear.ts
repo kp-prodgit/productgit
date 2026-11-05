@@ -1,13 +1,13 @@
 import { SIZES, STATUSES, type Size, type Status, type Task } from "../core/types.js";
 import type { Fetch } from "../sources/slack.js";
-import type { NewTask, Tracker } from "./types.js";
+import { meetingDescription, type MeetingEntry, type NewTask, type Tracker } from "./types.js";
 
 /**
  * Linear adapter (SCOPE-1). PMX fields are label groups, not custom fields, so no Linear admin
  * is needed (TASK-6). The mapping is shared with the control plane's canvas proxy
  * (docs/05-control-plane-api.md).
  */
-export const GROUPS = { status: "pmx-status", category: "pmx-category", size: "pmx-size", agent: "pmx-agent" } as const;
+export const GROUPS = { status: "pmx-status", category: "pmx-category", size: "pmx-size", agent: "pmx-agent", kind: "pmx-kind" } as const;
 type Group = keyof typeof GROUPS;
 
 interface Label {
@@ -85,6 +85,40 @@ export function linearTracker(o: LinearOpts): Tracker {
     return created.id;
   }
 
+  const kindOf = (n: any) => n.labels.nodes.find((l: any) => l.parent?.name === GROUPS.kind)?.name ?? "task";
+
+  async function allIssues(): Promise<any[]> {
+    const out: any[] = [];
+    let after: string | null = null;
+    do {
+      const d: any = await gql(
+        `query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after) { nodes { ${ISSUE_FIELDS} } pageInfo { hasNextPage endCursor } } } }`,
+        { id: o.projectId, after },
+      );
+      const page = d.project.issues;
+      out.push(...page.nodes);
+      after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
+    } while (after);
+    return out;
+  }
+
+  function toMeeting(n: any): MeetingEntry {
+    const t = toTask(n);
+    return {
+      id: t.id, identifier: t.identifier, url: t.url, title: t.title,
+      keys: [...t.description.matchAll(/^pmx:meeting (\S+)/gm)].map((m) => m[1]!),
+      status: t.status === "done" ? "done" : t.status === "blocked" ? "blocked" : "running",
+      tasks: [...t.description.matchAll(/^pmx:task (\S+)/gm)].map((m) => m[1]!),
+      agent: t.agent,
+    };
+  }
+
+  /** The team's first workflow state of type "completed", so a finished meeting shows as Done in Linear. */
+  async function completedState(): Promise<string | null> {
+    const d = await gql(`query($id: String!) { team(id: $id) { states { nodes { id type position } } } }`, { id: await team() });
+    return (d.team.states.nodes as any[]).filter((x) => x.type === "completed").sort((a, b) => a.position - b.position)[0]?.id ?? null;
+  }
+
   function toTask(n: any): Task {
     const ls: { name: string; group: string | null }[] = n.labels.nodes.map((l: any) => ({ name: l.name, group: l.parent?.name ?? null }));
     const pick = (g: Group) => ls.find((l) => l.group === GROUPS[g])?.name ?? null;
@@ -126,17 +160,8 @@ export function linearTracker(o: LinearOpts): Tracker {
   return {
     kind: "linear",
     async list(opts) {
-      const out: Task[] = [];
-      let after: string | null = null;
-      do {
-        const d: any = await gql(
-          `query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after) { nodes { ${ISSUE_FIELDS} } pageInfo { hasNextPage endCursor } } } }`,
-          { id: o.projectId, after },
-        );
-        const page = d.project.issues;
-        out.push(...page.nodes.map(toTask));
-        after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
-      } while (after);
+      // Meeting ledger entries are not tasks (MEET-2).
+      const out = (await allIssues()).filter((n) => kindOf(n) !== "meeting").map(toTask);
       return opts?.status ? out.filter((t) => t.status !== null && opts.status!.includes(t.status)) : out;
     },
     async get(id) {
@@ -166,6 +191,26 @@ export function linearTracker(o: LinearOpts): Tracker {
       const issue = await inProject(id);
       const description = `${issue.description ?? ""}\npmx:note ${note.replace(/\s+/g, " ").trim()}`;
       await gql(`mutation($id: String!, $i: IssueUpdateInput!) { issueUpdate(id: $id, input: $i) { success } }`, { id, i: { description } });
+    },
+    async listMeetings() {
+      return (await allIssues()).filter((n) => kindOf(n) === "meeting").map(toMeeting);
+    },
+    async lodgeMeeting(m) {
+      const labelIds = [await label("kind", "meeting"), await label("status", "running"), await label("agent", m.agent)];
+      const d = await gql(`mutation($i: IssueCreateInput!) { issueCreate(input: $i) { issue { ${ISSUE_FIELDS} } } }`, {
+        i: { teamId: await team(), projectId: o.projectId, title: `Meeting · ${m.title} · ${m.at}`, description: meetingDescription(m), labelIds },
+      });
+      return toMeeting(d.issueCreate.issue);
+    },
+    async finishMeeting(id, f) {
+      const issue = await inProject(id);
+      if (kindOf(issue) !== "meeting") throw new Error(`Refusing to finish ${issue.identifier}: it is a task, not a lodged meeting.`);
+      const lines = f.tasks.filter((t) => !(issue.description ?? "").includes(`pmx:task ${t}`)).map((t) => `pmx:task ${t}`);
+      const description = lines.length ? `${issue.description ?? ""}\n${lines.join("\n")}` : issue.description;
+      const stateId = f.status === "done" ? await completedState() : null;
+      await gql(`mutation($id: String!, $i: IssueUpdateInput!) { issueUpdate(id: $id, input: $i) { success } }`, { id, i: { description, ...(stateId ? { stateId } : {}) } });
+      await setGroupLabel(id, "status", f.status);
+      await gql(`mutation($i: CommentCreateInput!) { commentCreate(input: $i) { success } }`, { i: { issueId: id, body: f.note } });
     },
     async comment(id, body) {
       await inProject(id);

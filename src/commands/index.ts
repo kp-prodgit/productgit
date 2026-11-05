@@ -22,6 +22,7 @@ import { startExplainServer } from "../explain/server.js";
 import { pullStep, releaseStep, synthStep, teamCommands } from "./team.js";
 import { reviewCommand } from "./review.js";
 import { cloudCommands } from "./cloud.js";
+import { companyStep, meetingCommands, todoStep } from "./meetings.js";
 import { syncAnalytics } from "../cloud/account.js";
 
 export interface RunArgs {
@@ -45,8 +46,10 @@ const yes = { yes: { type: "boolean", short: "y" } } as const;
 /** Steps `pmx tick` runs, in order. Later milestones add synthesis and pull. */
 export const tickSteps: [string, TickStep][] = [
   ["digest", digestStep],
+  ["todo", todoStep],
   ["release", releaseStep],
   ["synthesize", synthStep],
+  ["company", companyStep],
   ["pull", pullStep],
   ["events", syncAnalytics],
 ];
@@ -165,6 +168,7 @@ Commit it in a PR of its own. Teammates install it from their checkout with:
       return 0;
     },
   },
+  ...meetingCommands,
   ...teamCommands,
   reviewCommand,
   ...cloudCommands,

@@ -33,11 +33,15 @@ export async function effectiveTeam(team: TeamConfig, personal: PersonalConfig):
   return { team: cur, blockRuns };
 }
 
-/** ee/ registers the cloud lease, the brokered Linear token, policy and auto-pause here. */
-const overrides: { tracker?: Factory<Tracker>; lease?: Factory<LeaseProvider>; paused?: ((ctx: Ctx) => Promise<Map<string, string>>)[] } = { paused: [] };
+export type ProjectRef = { teamKey: string; projectId: string };
+type ProjectFactory = (ctx: Ctx, p: ProjectRef) => Promise<Tracker | null>;
 
-export function registerServices(o: { tracker?: Factory<Tracker>; lease?: Factory<LeaseProvider>; paused?: (ctx: Ctx) => Promise<Map<string, string>> }): void {
+/** ee/ registers the cloud lease, the brokered Linear token, policy and auto-pause here. */
+const overrides: { tracker?: Factory<Tracker>; lease?: Factory<LeaseProvider>; paused?: ((ctx: Ctx) => Promise<Map<string, string>>)[]; project?: ProjectFactory } = { paused: [] };
+
+export function registerServices(o: { tracker?: Factory<Tracker>; lease?: Factory<LeaseProvider>; paused?: (ctx: Ctx) => Promise<Map<string, string>>; project?: ProjectFactory }): void {
   if (o.tracker) overrides.tracker = o.tracker;
+  if (o.project) overrides.project = o.project;
   if (o.lease) overrides.lease = o.lease;
   if (o.paused) overrides.paused!.push(o.paused);
 }
@@ -56,6 +60,15 @@ export async function services(ctx: Ctx, test?: Partial<Services>): Promise<Serv
         return m;
       }),
   };
+}
+
+/** A read-mostly tracker for another team's PMX project (COMPANY-1). Same token as this team's. */
+export async function projectTracker(ctx: Ctx, p: ProjectRef): Promise<Tracker> {
+  const viaEe = await overrides.project?.(ctx, p);
+  if (viaEe) return viaEe;
+  const token = await ctx.keychain.get("linear-token");
+  if (!token) throw new Error("No Linear token in the keychain. Run `pmx init`, or `pmx login` if your team uses the control plane.");
+  return linearTracker({ token, teamKey: p.teamKey, projectId: p.projectId, fetch: ctx.fetch });
 }
 
 async function defaultTracker(ctx: Ctx): Promise<Tracker> {

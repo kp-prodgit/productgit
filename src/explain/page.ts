@@ -143,7 +143,7 @@ async function loadRuns() {
     }
     const pick = h("select");
     for (const r of runs) {
-      const o = h("option", null, (r.type === "digest" ? "Digest" : r.dryRun ? "Suggested tasks (dry run)" : "Suggested tasks") + " · " + new Date(r.at).toLocaleString());
+      const o = h("option", null, (r.type === "digest" ? "Digest" : r.type === "todo" ? "Your to-dos" : r.dryRun ? "Suggested tasks (dry run)" : "Suggested tasks") + " · " + new Date(r.at).toLocaleString());
       o.value = r.id;
       pick.append(o);
     }
@@ -163,12 +163,14 @@ function renderRun(el, { receipt: r, live }) {
   const masked = Object.values(r.masked).reduce((a, b) => a + b, 0);
   const lede = h("p", "lede", r.type === "digest"
     ? "PMX reads your call transcripts, removes anything personal, masks contact details, then asks Claude to write a digest where every claim cites a call. You approve it before anyone else sees it."
+    : r.type === "todo"
+    ? "PMX reads your own meetings, including 1:1s, cuts health, pay and performance passages, masks contact details, then asks Claude for the things you committed to. Your to-dos never leave this Mac."
     : "PMX reads the team's sources, removes anything personal, then asks Claude to suggest tasks and size each one with the team rubric. A person triages them before any agent runs.");
 
   const f = (n, l) => h("div", "f", h("div", "n", n), h("div", "l", l));
   const arrow = () => h("div", "arrow", "→");
   const funnel = h("div", "funnel", f(r.sources.length, "found"), arrow(), f(used, "used"), arrow(), f(cuts, cuts === 1 ? "passage cut" : "passages cut"), arrow(), f(masked, "masked"), arrow(),
-    f(r.model ? money(r.model.costUsd) : "–", "Claude"), arrow(), f(r.digest ? r.digest.cited.length : r.synth ? r.synth.tasks.length : "–", r.digest ? "sources cited" : "tasks"));
+    f(r.model ? money(r.model.costUsd) : "–", "Claude"), arrow(), f(r.digest ? r.digest.cited.length : r.synth ? r.synth.tasks.length : r.todo ? r.todo.added.length : "–", r.digest ? "sources cited" : r.todo ? "to-dos" : "tasks"));
 
   const steps = h("ol", "steps");
   const step = (n, title, ...kids) => steps.append(h("li", null, h("div", "num", n), h("h3", null, title), ...kids));
@@ -189,11 +191,14 @@ function renderRun(el, { receipt: r, live }) {
     const cutsLive = l.cuts.length ? l.cuts : s.passagesCut.map((c) => ({ rule: c.rule, line: null, matched: null }));
     for (const c of cutsLive)
       card.append(h("div", "cut", "Cut " + (c.line ? "the passage at line " + c.line : "one passage") + ": " + holdLabels[c.rule] + (c.matched ? " (matched “" + c.matched + "”)" : "") + ". The text was not sent or stored."));
+    if (s.ledger) card.append(h("div", "small", LEDGER[s.ledger.state] + (s.ledger.entry ? " (" + s.ledger.entry + ")" : "") + "."));
     if (s.decision === "used") card.append(h("div", "muted small", plural(s.passagesUsed, "passage") + " sent to Claude."));
     return card;
   });
   step(2, "Privacy rules decided what Claude may read",
-    h("p", "muted small", "Only calls with someone from outside your company are used, and passages about 1:1s, performance, pay or health are always cut. See the Privacy rules tab for the exact rules."),
+    h("p", "muted small", r.rules.allowOneOnOne
+      ? "Your own to-dos may come from internal meetings and 1:1s, because they stay on this Mac. Passages about performance, pay or health are still cut. See the Privacy rules tab for the exact rules."
+      : "Only calls with someone from outside your company are used, and passages about 1:1s, performance, pay or health are always cut. Meetings the team already processed are skipped. See the Privacy rules tab for the exact rules."),
     list);
 
   const m = Object.entries(r.masked).filter(([, n]) => n).map(([k, n]) => chip(plural(n, MASK[k][0], MASK[k][1])));
@@ -218,10 +223,23 @@ function renderRun(el, { receipt: r, live }) {
   if (r.synth) {
     step(5, plural(r.synth.tasks.length, "suggested task"), r.synth.tasks.map(taskCard), r.synth.skipped.map((s) => h("p", "small muted", "Skipped: " + s)));
   }
+  if (r.todo) {
+    step(5, plural(r.todo.added.length, "new to-do"),
+      r.todo.added.map((t) => h("div", "card", h("strong", null, t.text), h("div", "muted small", "From " + t.source + (t.due ? " · due " + t.due : "")))),
+      r.todo.duplicates ? h("p", "small muted", plural(r.todo.duplicates, "to-do") + " already on your list, so not added again.") : null,
+      r.todo.dropped.map((d) => h("p", "small muted", "Dropped: " + d)));
+  }
   if (r.error) steps.append(h("li", null, h("div", "num", "!"), h("h3", null, "The run failed"), h("p", "err", r.error)));
   el.replaceChildren(lede, funnel, steps);
 }
 
+const LEDGER = {
+  "processed-now": "Processed in this run",
+  "would-process": "Would be processed (dry run)",
+  "already-processed": "Skipped: already processed",
+  "in-progress-elsewhere": "Skipped: another machine is processing it",
+  "before-window": "Skipped: before this run's start date",
+};
 let flagText = {};
 function taskCard(t) {
   const s = t.sizing;

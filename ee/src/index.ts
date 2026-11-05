@@ -32,6 +32,14 @@ async function brokeredTracker(ctx: Ctx) {
   return linearTracker({ token: accessToken, teamKey: ctx.team.tracker.teamKey, projectId: ctx.team.tracker.projectId, fetch: ctx.fetch });
 }
 
+/** Another team's project, through the same brokered token (COMPANY-1). */
+async function brokeredProject(ctx: Ctx, p: { teamKey: string; projectId: string }) {
+  const cloud = cloudFor(ctx.team, ctx.keychain, ctx.fetch);
+  if (!cloud || (await ctx.keychain.get("linear-token"))) return null;
+  const { accessToken } = await cloud.call<{ accessToken: string }>("POST", `/orgs/${ctx.team.controlPlane!.orgId}/linear/token`);
+  return linearTracker({ token: accessToken, teamKey: p.teamKey, projectId: p.projectId, fetch: ctx.fetch });
+}
+
 async function cloudLeaseFor(ctx: Ctx) {
   const cloud = cloudFor(ctx.team, ctx.keychain, ctx.fetch);
   if (ctx.team.lease !== "cloud") return null;
@@ -58,7 +66,7 @@ const isBrainMachine = (ctx: Ctx, b: BrainPolicy) => {
 
 /** Team features (source-visible, commercial). Registered once at CLI start-up. */
 export function registerEe(): Command[] {
-  registerServices({ paused: autoPaused, tracker: brokeredTracker, lease: cloudLeaseFor });
+  registerServices({ paused: autoPaused, tracker: brokeredTracker, lease: cloudLeaseFor, project: brokeredProject });
   setUnpauseHandler(unpause);
 
   registerTeamTransform(async (team, personal) => {

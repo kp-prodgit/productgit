@@ -11,9 +11,11 @@ export interface State {
   lastEventSyncAt: string | null;
   lastPipelineSyncAt: string | null;
   lastBrainAt: string | null;
+  lastCollectAt: string | null;
+  lastRollupAt: string | null;
 }
 
-const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null };
+const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null };
 
 export async function loadState(): Promise<State> {
   return { ...EMPTY, ...((await readJson<Partial<State>>(paths.state())) ?? {}) };

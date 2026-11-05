@@ -29,6 +29,8 @@ export interface TeamConfig {
   caps: { perRunUsd: number; perDayUsd: number };
   autoPause: { minVerdicts: number; threshold: number; windowDays: number };
   controlPlane?: { url: string; orgId: string };
+  /** Company roll-up (COMPANY-1): this repo's tracker is the company project; these are the teams it merges. */
+  company?: { teams: { name: string; teamKey: string; projectId: string }[]; machine: string | null } | null;
 }
 
 export type Plan = "team" | "enterprise" | "api" | "bedrock" | "vertex" | "pro" | "max" | "free";
@@ -53,6 +55,8 @@ export interface PersonalConfig {
   cloud?: { url: string; orgId: string } | null;
   /** Content-free analytics events to the hosted app (PRIV-5). Off until the PM signs in and sees what's sent. */
   analytics?: { enabled: boolean; decidedAt: string } | null;
+  /** Who "me" is in a transcript, for individual to-dos (TODO-1). Learned from `pmx collect` or `pmx todo --me`. */
+  identity?: { names: string[]; emails: string[] } | null;
 }
 
 export const DEFAULT_TEAM: Omit<TeamConfig, "team"> = {

@@ -10,6 +10,7 @@ import { compareReports, neutralityRun, type NeutralityReport } from "../run/neu
 import { runTask } from "../run/run.js";
 import { verifyPr } from "../run/verify.js";
 import { synthesize } from "../synth/synthesize.js";
+import { startOfDay } from "../meetings/ledger.js";
 import type { Command } from "./index.js";
 import type { TickStep } from "./tick.js";
 
@@ -24,13 +25,17 @@ export const teamCommands: Command[] = [
   {
     name: "synthesize",
     summary: "Turn team sources into sized tasks in the PMX inbox (a human triages them)",
-    usage: "pmx synthesize [--days 1] [--dry-run]",
-    options: { days: { type: "string" }, "dry-run": { type: "boolean" } },
+    usage: "pmx synthesize [--since today | YYYY-MM-DD] [--days 1] [--dry-run]",
+    options: { days: { type: "string" }, since: { type: "string" }, "dry-run": { type: "boolean" } },
     async run(a) {
       const ctx = await a.ctx();
-      const r = await synthesize(ctx, await services(ctx), { days: Number(a.values.days ?? 1), dryRun: a.values["dry-run"] });
+      const since = sinceDate(a.values.since, ctx.now());
+      const days = Math.max(Number(a.values.days ?? 1), Math.ceil((ctx.now().getTime() - since.getTime()) / 86400000) + 1);
+      const r = await synthesize(ctx, await services(ctx), { days, since, dryRun: a.values["dry-run"] });
       for (const p of r.posted) console.log(`+ ${p.identifier} ${p.title}`);
       for (const s of r.skipped) console.log(`· skipped ${s}`);
+      const m = r.meetings;
+      console.log(`Meetings since ${since.toDateString()}: ${m.processed.length} processed now${m.processed.length ? ` (${m.processed.map((x) => x.entry).join(", ")} marked done in the tracker)` : ""}, ${m.already} already processed by the team, ${m.busy} being processed on another machine.`);
       console.log(a.values["dry-run"]
         ? `Dry run: ${r.posted.length} task(s) would be posted; nothing was. ${r.held} item(s) or passage(s) left out or cut.`
         : `${r.posted.length} task(s) posted to inbox; ${r.held} item(s) or passage(s) left out or cut. Triage them in Linear: move to ready to let agents pull.`);
@@ -135,12 +140,25 @@ export const releaseStep: TickStep = async (ctx) => {
   return r.length ? r.join("; ") : null;
 };
 
+/** `--since today` (default) or a date: the first day whose meetings count as unprocessed (MEET-3). */
+function sinceDate(v: string | undefined, now: Date): Date {
+  if (!v || v === "today") return startOfDay(now);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`--since takes "today" or a date like 2026-11-05, not "${v}".`);
+  return new Date(`${v}T00:00:00`);
+}
+
+/**
+ * Polls every tick on the synthesizer machine (MEET-3): today's meetings not yet in the team's ledger
+ * are processed at once. With nothing new it makes no model call. Slack still runs every 6 hours.
+ */
 export const synthStep: TickStep = async (ctx: Ctx) => {
   if (ctx.team.synthesizer !== ctx.agent && ctx.team.synthesizer !== ctx.personal.handle) return null;
+  if (ctx.team.tracker.kind === "none") return null;
   const s = await loadState();
-  if (s.lastSynthAt && ctx.now().getTime() - new Date(s.lastSynthAt).getTime() < 6 * 3600000) return null;
-  const r = await synthesize(ctx, await services(ctx), { days: 1 });
-  return `${r.posted.length} task(s) posted to inbox`;
+  const slackDue = !s.lastSynthAt || ctx.now().getTime() - new Date(s.lastSynthAt).getTime() >= 6 * 3600000;
+  const r = await synthesize(ctx, await services(ctx), { days: 2, since: startOfDay(ctx.now()), skipIfNothingNew: !slackDue });
+  if (!r.meetings.processed.length && !r.posted.length) return null;
+  return `${r.meetings.processed.length} meeting(s) processed and marked done, ${r.posted.length} task(s) posted to inbox`;
 };
 
 export const pullStep: TickStep = async (ctx) => {
