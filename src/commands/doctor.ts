@@ -1,5 +1,6 @@
 import { neededTasks, taskExists } from "../claude/tasks.js";
-import { appSkillInstalled } from "../claude/skill.js";
+import { boardUrl, checkBoard } from "../claude/board.js";
+import { appSkillInstalled, BOARD_SKILL } from "../claude/skill.js";
 import { loadState } from "../core/state.js";
 import { VENDORED_CLI } from "../core/vendor.js";
 import { atLeast, compareVersions, currentVersion, vendoredVersion } from "../core/version.js";
@@ -76,6 +77,13 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const fix = (await appSkillInstalled()) ? "type /pmx-schedule in the Claude app" : "run `pmx schedule`";
   for (const t of await neededTasks(d.team, d.keychain))
     add(`claude.task.${t.id}`, await taskExists(t.id), `Claude scheduled task "${t.title}"${(await taskExists(t.id)) ? "" : ` is missing: ${fix}`}`, "warn");
+  // The Claude board (BOARD-1), only where Claude and Linear are both in use.
+  if ((await checkBoard(d.team)).ok) {
+    const b = boardUrl(d.team, d.personal);
+    const stale = b?.source === "personal" && d.personal.board?.version !== current;
+    const how = (await appSkillInstalled(BOARD_SKILL)) ? "type /pmx-board in the Claude app" : "run `pmx board --install-skill`, then type /pmx-board in the Claude app";
+    add("claude.board", !!b && !stale, b ? `team board ${b.url}${stale ? `: published with an older pmx; ${how} to update it` : ""}` : `no Claude board yet: ${how}`, "warn");
+  }
   const st = await loadState();
   if (d.team.cli?.autoUpdate) {
     const au = st.autoUpdate;

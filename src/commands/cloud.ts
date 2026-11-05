@@ -1,6 +1,7 @@
 import { analyticsOn, ANALYTICS_DISCLOSURE, cloudTarget, connect, pendingEvents, shareOrg } from "../cloud/account.js";
 import { Cloud, DEFAULT_CONTROL_PLANE } from "../cloud/client.js";
 import { login } from "../cloud/login.js";
+import { boardUrl } from "../claude/board.js";
 import { savePersonalConfig } from "../core/config.js";
 import { exec } from "../core/exec.js";
 import { macKeychain } from "../core/keychain.js";
@@ -69,13 +70,18 @@ export const cloudCommands: Command[] = [
   },
   {
     name: "canvas",
-    summary: "Open the team board in the browser: pool → ready → in flight → review → done (free)",
+    summary: "Open the team board: the Claude board from /pmx-board if there is one, else the hosted app (free)",
     options: {},
     async run(a) {
       const ctx = await a.ctx();
+      const board = boardUrl(ctx.team, ctx.personal);
+      if (board) {
+        await openUrl(board.url);
+        return 0;
+      }
       const target = cloudTarget(ctx.team, ctx.personal);
       if (!target) {
-        console.log("The board lives in the free hosted app. Run `pmx login` first.");
+        console.log("No board yet. In the Claude app, type /pmx-board to publish the team board as a live artifact (see `pmx board`), or run `pmx login` for the hosted app.");
         return 1;
       }
       const url = `${APP}/?org=${encodeURIComponent(target.orgId)}`;

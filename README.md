@@ -36,6 +36,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `explain` | How a run decided: what was found, used, left out, cut and masked, which skills and model ran, why each task got its size, and the cost. `--web` opens a local page |
 | `skills` | The Claude skills PMX can use, what each does, when it runs, and whether your team's copy differs from the built-in one |
 | `linear` | Connect to Linear: `login` (browser sign-in, no API key), `logout`, `status`; with neither a key nor a sign-in, Claude relays through its Linear connector |
+| `board` | The team board as a live Claude artifact (only when you use Claude and Linear): the link, `--open`, and `--install-skill` for `/pmx-board`, which publishes it from inside the Claude app |
 | `schedule` | The scheduled tasks PMX needs in your Claude app and whether each exists; `--install-skill` adds `/pmx-schedule`, which creates them from inside the Claude app |
 | `collect` | Meeting transcripts from your Claude connectors (Granola, Fireflies…): `--prompt` prints the scheduled task's instructions, `--check` validates what it saved |
 | `todo` | Your own to-dos from your meetings, including 1:1s; never leaves your Mac. `--refresh` reads today's unread meetings, `done <id>` checks one off |
@@ -49,7 +50,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `neutrality` | Run skill fixtures in a clean profile; `--compare` two machines' reports |
 | `review` | Accept, reject or redo-with-note in the terminal, or `--web` for a local review page; `--stats` for accept rates |
 | `login` | Sign in to the free hosted app; creates your team's free org if there isn't one |
-| `canvas` | Open the team board in the browser (free) |
+| `canvas` | Open the team board: the Claude board if there is one, else the hosted app (free) |
 | `analytics` | What this machine sends to your hosted org; `--show` prints the pending events, `on` / `off` |
 | `brain` | Team plan: assess the board and suggest, queue or (on autopilot) take the next actions, each with a reason; `--review` approves what's waiting, `--why` explains the last pass |
 | `policy` / `license` | Team plan (`ee/`): show the applied admin policy, show or refresh the license |
@@ -66,6 +67,12 @@ PMX reaches Linear in the first way available on each machine:
 4. **Claude**, through the Linear connector in your Claude app. A scheduled task applies the exact changes PMX queued and brings back the PMX project. PMX checks every result and keeps all the rules in its own code; Claude only carries the changes. Changes reach Linear at the next sync (hourly on weekdays), not instantly.
 
 PMX can't create tasks in your Claude app itself, but Claude can. `pmx init` offers to add a `/pmx-schedule` command to your Claude app (or run `pmx schedule --install-skill`). Type `/pmx-schedule` in the Claude desktop app and Claude creates the tasks this machine needs (meeting collection, and the Linear sync when you use option 4), with one approval. `pmx schedule` shows what's set up.
+
+### The board inside Claude
+
+When your team uses Linear and Claude, `pmx init` also adds `/pmx-board` (or run `pmx board --install-skill`). Type it in the Claude desktop app and Claude publishes the team board as a live artifact in your Claude account: pool → ready → in flight → review → done, read from the PMX project through each viewer's own Linear connector. Everyone works inside Claude, with no hosted app or API key. The board moves cards between the pool and Ready when someone clicks; everything else stays in PMX.
+
+Share it from the artifact's Share menu, then add `"board": { "url": "<link>" }` to `pmx.config.json` in a PR, so every teammate's `pmx canvas` opens the same board. Each viewer allows Linear for the board once.
 
 ## Updating
 

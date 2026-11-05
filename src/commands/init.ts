@@ -1,4 +1,5 @@
-import { appSkillInstalled, appSkillTarget, installAppSkill } from "../claude/skill.js";
+import { boardUrl, checkBoard, renderBoard } from "../claude/board.js";
+import { appSkillInstalled, appSkillTarget, BOARD_SKILL, installAppSkill } from "../claude/skill.js";
 import { createHash } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { hostname, homedir } from "node:os";
@@ -168,15 +169,26 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   }
   if (d.invite && d.onInvite) await d.onInvite(d.invite);
 
-  // CLAUDE-2: a /pmx-schedule command in the PM's own Claude app, which creates PMX's scheduled tasks.
-  if (await ask.confirm("Add a /pmx-schedule command to your Claude app, so Claude can create PMX's scheduled tasks for you?", true)) {
-    const r = await installAppSkill().catch(() => null);
-    if (r === "kept-yours") out.warn(`Left your own ${appSkillTarget()} alone.`);
+  // CLAUDE-2 and BOARD-1: commands in the PM's own Claude app. /pmx-schedule creates PMX's scheduled tasks;
+  // /pmx-board publishes the team board as a live artifact, offered only when Claude and Linear are both in use.
+  const board = await checkBoard(team);
+  const question = board.ok
+    ? "Add /pmx-schedule and /pmx-board commands to your Claude app, so Claude can create PMX's scheduled tasks and publish your team's live board?"
+    : "Add a /pmx-schedule command to your Claude app, so Claude can create PMX's scheduled tasks for you?";
+  if (await ask.confirm(question, true)) {
+    for (const name of board.ok ? [undefined, BOARD_SKILL] as const : [undefined] as const) {
+      const r = await installAppSkill(name).catch(() => null);
+      if (r === "kept-yours") out.warn(`Left your own ${appSkillTarget(name)} alone.`);
+    }
+    if (board.ok) await renderBoard(team).catch(() => null);
   }
   out.info("\nSetup done. The first week runs pulls as dry runs, so you can see what your agent would do.");
   out.info(`Next: put call transcripts in ${transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
   out.info((await appSkillInstalled())
     ? "Then, in the Claude desktop app, type /pmx-schedule: Claude creates PMX's scheduled tasks (meeting collection, and the Linear sync if you didn't sign in)."
     : "Then set up PMX's tasks in your Claude app: run `pmx schedule` and paste what it prints into the Claude app.");
+  const shared = boardUrl(team, personal);
+  if (shared) out.info(`Your team's board: ${shared.url}`);
+  else if (board.ok && (await appSkillInstalled(BOARD_SKILL))) out.info("For the team board, type /pmx-board in the Claude app: Claude publishes it as a live artifact that reads Linear through your Linear connector.");
   return personal;
 }

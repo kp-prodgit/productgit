@@ -2,6 +2,13 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.9.0: the team board inside Claude
+
+- **`/pmx-board` (BOARD-1).** The team board as a live Claude artifact: pool → ready → in flight → review → done, read from your Linear project through each viewer's own Linear connector, so it needs no hosted app, API key or sign-in. It moves cards between the pool and Ready (with category and size) when someone clicks; agents, runs and reviews stay in PMX. Offered only when PMX is used with Claude: `pmx init` adds `/pmx-board` beside `/pmx-schedule` when Claude is set up and the team uses Linear (or run `pmx board --install-skill`). Type it in the Claude app and Claude publishes the page PMX prepared, with exactly the Linear tools it needs.
+- `pmx board` shows the board's link, `--open` opens it, `--json` / `--html` prepare the page, `--set-url` saves the link. A board committed in `pmx.config.json` (`board.url`) is the team's, so teammates open it instead of publishing their own.
+- `pmx canvas` opens the Claude board when there is one. `pmx doctor` warns when it's missing or was published by an older pmx.
+- Installed Claude commands (`/pmx-schedule`, `/pmx-board`) refresh themselves after a PMX update.
+
 ## 0.8.0: /pmx-schedule in your Claude app
 
 - **`/pmx-schedule` (CLAUDE-2).** PMX can't reach the Claude app's scheduling tool, but Claude can from inside an app session. `pmx init` offers to add a `/pmx-schedule` skill to your personal Claude skills (or run `pmx schedule --install-skill`). Type it in the Claude app and Claude creates each scheduled task this machine is missing, exactly as PMX lists them (`pmx schedule --json`), with one approval. PMX refreshes its own copy and never overwrites a skill you wrote.

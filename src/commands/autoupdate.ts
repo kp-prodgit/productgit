@@ -1,3 +1,4 @@
+import { refreshAppSkills } from "../claude/skill.js";
 import type { Ctx } from "../core/context.js";
 import { notify } from "../core/notify.js";
 import { loadState, updateState } from "../core/state.js";
@@ -13,7 +14,9 @@ const EVERY_MS = 3600000;
  * says so once per version, in a notification and in `pmx doctor`.
  */
 export const updateStep: TickStep = async (ctx: Ctx) => {
-  if (!ctx.team.cli?.autoUpdate) return null;
+  // A newer pmx may ship newer Claude commands (/pmx-schedule, /pmx-board); keep the installed copies current.
+  const refreshed = await refreshAppSkills().catch(() => []);
+  if (!ctx.team.cli?.autoUpdate) return refreshed.length ? `updated Claude commands: ${refreshed.map((n) => `/${n}`).join(", ")}` : null;
   const s = await loadState();
   if (s.autoUpdate && ctx.now().getTime() - Date.parse(s.autoUpdate.checkedAt) < EVERY_MS) return null;
   const r = await installTeamVersion(ctx.personal.repoPath, ctx.exec, { pull: await ctx.repo.hasRemote() });

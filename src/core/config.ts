@@ -37,6 +37,8 @@ export interface TeamConfig {
    */
   cli?: { min: string; autoUpdate?: boolean } | null;
   company?: { teams: { name: string; teamKey: string; projectId: string }[]; machine: string | null } | null;
+  /** The team's live board, a Claude artifact everyone opens (BOARD-1). */
+  board?: { url: string } | null;
 }
 
 export type Plan = "team" | "enterprise" | "api" | "bedrock" | "vertex" | "pro" | "max" | "free";
@@ -63,6 +65,8 @@ export interface PersonalConfig {
   analytics?: { enabled: boolean; decidedAt: string } | null;
   /** Who "me" is in a transcript, for individual to-dos (TODO-1). Learned from `pmx collect` or `pmx todo --me`. */
   identity?: { names: string[]; emails: string[] } | null;
+  /** The board this PM published from this Mac with /pmx-board, and with which pmx (BOARD-1). */
+  board?: { url: string; version: string; publishedAt: string } | null;
 }
 
 export const DEFAULT_TEAM: Omit<TeamConfig, "team"> = {
@@ -103,6 +107,7 @@ export function validateTeamConfig(c: TeamConfig): TeamConfig {
   assertSchema("teamConfig", c.version, TEAM_CONFIG_FILE);
   const problems: string[] = [];
   if (c.cli && !isVersion(c.cli.min)) problems.push(`cli.min must be a version like 0.5.0, not "${c.cli.min}"`);
+  if (c.board && !/^https:\/\/claude\.ai\/(code\/)?artifact\/[A-Za-z0-9_-]+\/?$/.test(c.board.url ?? "")) problems.push("board.url must be a Claude artifact link (https://claude.ai/artifact/…)");
   if (!c.model) problems.push("model must be set (NEUT-1)");
   for (const s of SIZES) if (!c.sizes?.[s]) problems.push(`sizes.${s} missing`);
   for (const [cat, v] of Object.entries(c.categories ?? {}))

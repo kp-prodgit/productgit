@@ -1,0 +1,485 @@
+<title>PMX Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- Installed by Product Git. `pmx board --html` fills in the config below; /pmx-board publishes it as a Claude artifact (BOARD-1). -->
+<script type="application/json" id="pmx-config">{"team":"","teamKey":"","projectId":"","version":""}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a five-lane pipeline (pool → ready → in flight → review → done); one lane at a time on phones. */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #eef0f4; --line: #dde1e8;
+  --fg: #1b2230; --muted: #5d6676; --faint: #8a93a3; --accent: #3466d6; --accent-fg: #ffffff;
+  --inbox: #7d8899; --ready: #2f86e0; --claimed: #9a68e8; --running: #c99a16; --blocked: #d64545; --review: #e07b2c; --done: #2f9e64;
+  --warn-bg: #fff4e5; --warn-fg: #7a4a08; --err-bg: #fdecec; --err-fg: #8f2020;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1f27; --surface-2: #222833; --line: #2c3340;
+  --fg: #e4e8ef; --muted: #9aa3b3; --faint: #6d7686; --accent: #6f9cff; --accent-fg: #0d1220;
+  --inbox: #8e99aa; --ready: #5aa4f0; --claimed: #b48cf5; --running: #e2b93b; --blocked: #f06b6b; --review: #f39a52; --done: #4cc185;
+  --warn-bg: #3a2a10; --warn-fg: #f6cf8e; --err-bg: #3d1a1a; --err-fg: #f5b0b0; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1f27; --surface-2: #222833; --line: #2c3340;
+  --fg: #e4e8ef; --muted: #9aa3b3; --faint: #6d7686; --accent: #6f9cff; --accent-fg: #0d1220;
+  --inbox: #8e99aa; --ready: #5aa4f0; --claimed: #b48cf5; --running: #e2b93b; --blocked: #f06b6b; --review: #f39a52; --done: #4cc185;
+  --warn-bg: #3a2a10; --warn-fg: #f6cf8e; --err-bg: #3d1a1a; --err-fg: #f5b0b0; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); padding-block: 16px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+button, select, input { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+a { color: var(--accent) }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 14px }
+header h1 { font-size: 18px; font-weight: 600; margin: 0; text-wrap: balance }
+header .sub { color: var(--muted); font-size: 13px }
+header .sub code { font-family: var(--mono); font-size: 12px }
+.fresh { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; display: flex; gap: 8px; align-items: center }
+.fresh button { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 2px 8px; font-size: 12px; color: var(--muted) }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px }
+.filters label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted) }
+.filters select, .filters input { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 5px 8px; font-size: 13px; text-transform: none; letter-spacing: 0; min-width: 0 }
+.filters input { width: 220px; max-width: 100% }
+.banner { border-radius: var(--radius); padding: 10px 12px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center }
+.banner.warn { background: var(--warn-bg); color: var(--warn-fg) }
+.banner.err { background: var(--err-bg); color: var(--err-fg) }
+.banner button { border: 0; background: var(--accent); color: var(--accent-fg); border-radius: var(--radius); padding: 5px 12px; font-weight: 500 }
+.tabs { display: none; gap: 4px; overflow-x: auto; margin-bottom: 12px }
+.tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; white-space: nowrap; font-size: 13px }
+.tabs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+.board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: start }
+.lane { background: var(--surface-2); border-radius: 8px; padding: 10px; min-width: 0 }
+.lane h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; display: flex; align-items: center; gap: 6px }
+.lane h2 .n { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums }
+.lane .hint { color: var(--muted); font-size: 12px; margin: 0 0 10px }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none }
+.cards { display: flex; flex-direction: column; gap: 8px }
+.group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 6px 0 -2px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.card.moving { opacity: .55 }
+.card .top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
+.id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-decoration: none }
+.id:hover { color: var(--accent); text-decoration: underline }
+.title { font-weight: 500; overflow-wrap: anywhere }
+.chips { display: flex; flex-wrap: wrap; gap: 4px }
+.chip { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); white-space: nowrap }
+.chip.size { font-family: var(--mono) }
+.chip.st { border-color: transparent; color: var(--accent-fg) }
+.prio { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums }
+.prio.p1 { color: var(--blocked) } .prio.p2 { color: var(--review) } .prio.p3 { color: var(--muted) } .prio.p4 { color: var(--faint) }
+.preview { color: var(--muted); font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; max-height: 7.5em; overflow: hidden }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.actions button { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 3px 9px; font-size: 12.5px }
+.actions button.go { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 500 }
+.actions select { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 3px 6px; font-size: 12.5px; min-width: 0 }
+.note { font-size: 12px; color: var(--muted) }
+.note.err { color: var(--err-fg) }
+.empty { color: var(--faint); font-size: 12.5px; padding: 6px 2px }
+.more { font-size: 12px; color: var(--muted); padding: 2px }
+.skeleton { height: 64px; border-radius: var(--radius); background: linear-gradient(90deg, var(--surface) 0%, var(--line) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite }
+@keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none } }
+.outside { max-width: 60ch; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px }
+.outside h2 { font-size: 15px; margin: 0 0 6px }
+.outside p { margin: 6px 0; color: var(--muted) }
+@media (max-width: 960px) {
+  .tabs { display: flex }
+  .board { grid-template-columns: minmax(0, 1fr) }
+  .lane { display: none }
+  .lane.active { display: block }
+  .filters input { width: 100% }
+  .filters label.q { flex: 1 1 100% }
+}
+</style>
+
+<header>
+  <h1 id="h-title">PMX Board</h1>
+  <span class="sub" id="h-sub"></span>
+  <span class="fresh"><span id="fresh"></span><button type="button" id="refresh" hidden>Refresh</button></span>
+</header>
+<div id="banner"></div>
+<div class="filters" id="filters" hidden>
+  <label for="f-category">Category<select id="f-category"><option value="">Any</option></select></label>
+  <label for="f-size">Size<select id="f-size"><option value="">Any</option></select></label>
+  <label for="f-who">Agent<select id="f-who"><option value="">Anyone</option></select></label>
+  <label for="f-q" class="q">Search<input id="f-q" type="search" placeholder="Title or ID"></label>
+</div>
+<nav class="tabs" id="tabs" aria-label="Lanes"></nav>
+<main class="board" id="board"></main>
+
+<script>
+(() => {
+  const CFG = JSON.parse(document.getElementById("pmx-config").textContent || "{}");
+  const LINEAR = "Linear";
+  const ZONES = [
+    { key: "pool", title: "Pool", hint: "New work. Triage it to Ready.", color: "--inbox" },
+    { key: "ready", title: "Ready", hint: "Agents pick these up on their next run.", color: "--ready" },
+    { key: "inFlight", title: "In flight", hint: "Claimed, running or blocked.", color: "--running" },
+    { key: "review", title: "Review", hint: "Drafts waiting for a human.", color: "--review" },
+    { key: "done", title: "Done", hint: "Accepted or finished.", color: "--done" },
+  ];
+  const STATUS_ZONE = { inbox: "pool", ready: "ready", claimed: "inFlight", running: "inFlight", blocked: "inFlight", review: "review", done: "done" };
+  const STATUS_COLOR = { inbox: "--inbox", ready: "--ready", claimed: "--claimed", running: "--running", blocked: "--blocked", review: "--review", done: "--done" };
+  const SIZES = ["S", "M", "L", "XL"];
+  const PRIORITY = { 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
+  const DONE_SHOWN = 15;
+  const FIELDS = ["id", "uuid", "title", "priority", "url", "labels", "status", "statusType", "assignee", "updatedAt", "completedAt", "description"];
+  const ISSUES_INPUT = { project: CFG.projectId, limit: 250, fields: FIELDS };
+  const LABELS_INPUT = { team: CFG.teamKey, includeGroups: true, limit: 250 };
+  const AUTHZ = ["needs_reauth", "server_not_connected", "selection_required", "blocked_by_policy", "approval_required", "not_in_manifest", "not_granted", "capability_disabled", "capability_removed"];
+
+  const $ = (id) => document.getElementById(id);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  const S = {
+    mcp: undefined, issues: null, labels: null, issuesAt: null, issuesErr: null, labelsErr: null,
+    zone: store.get("pmx-board-zone") || "ready", open: null, busy: {}, notes: {}, prs: {}, gen: 0,
+  };
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "style") el.setAttribute("style", v);
+      else el.setAttribute(k, v === true ? "" : String(v));
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+
+  // ---- Labels: Linear returns label names on issues; the team's label list says which PMX group each belongs to.
+  function labelIndex() {
+    const groupsOf = new Map(), ids = {};
+    for (const l of S.labels || []) {
+      if (l.isGroup || l.archivedAt || l.retiredAt) continue;
+      const g = l.parent || null;
+      if (!groupsOf.has(l.name)) groupsOf.set(l.name, []);
+      groupsOf.get(l.name).push(g);
+      if (g) (ids[g] ||= {})[l.name] = l.id;
+    }
+    return { groupsOf, ids };
+  }
+  function pick(names, group, L) {
+    for (const n of names) if ((L.groupsOf.get(n) || []).includes(group)) return n;
+    if (S.labels) return null;
+    // Labels not loaded: fall back to PMX's fixed names.
+    if (group === "pmx-status") return names.find((n) => STATUS_ZONE[n]) || null;
+    if (group === "pmx-size") return names.find((n) => SIZES.includes(n)) || null;
+    return null;
+  }
+
+  function textOf(md) {
+    return (md || "")
+      .split("\n").filter((l) => !/^\s*pmx:\S+/.test(l)).join("\n")
+      .replace(/<[^>]*\blabel="([^"]*)"[^>]*\/?>/g, "$1").replace(/<[^>]+>/g, "")
+      .replace(/\(truncated, use `get_issue` for full description\)/, "")
+      .replace(/[*_`#>]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  const personOf = (a) => (a == null ? null : typeof a === "string" ? a : a.name || a.displayName || a.email || null);
+
+  function cards() {
+    const L = labelIndex();
+    const out = { pool: [], ready: [], inFlight: [], review: [], done: [] };
+    for (const i of S.issues || []) {
+      const names = (i.labels || []).map((x) => (typeof x === "string" ? x : x && x.name)).filter(Boolean);
+      if (pick(names, "pmx-kind", L) === "meeting") continue;
+      let status = pick(names, "pmx-status", L);
+      const labelled = !!status && !!STATUS_ZONE[status];
+      if (!labelled) {
+        if (i.statusType === "canceled") continue;
+        status = i.statusType === "completed" ? "done" : "inbox";
+      }
+      const prio = typeof i.priority === "object" && i.priority ? i.priority.value : Number(i.priority) || 0;
+      out[STATUS_ZONE[status]].push({
+        uuid: i.uuid || i.id, identifier: i.id, title: i.title || "(untitled)", url: i.url, status, labelled,
+        category: pick(names, "pmx-category", L), size: pick(names, "pmx-size", L), agent: pick(names, "pmx-agent", L),
+        assignee: personOf(i.assignee), priority: prio, description: i.description || "",
+        finished: i.completedAt || i.updatedAt || "",
+      });
+    }
+    const rank = (p) => (p >= 1 && p <= 4 ? p : 5);
+    for (const [k, list] of Object.entries(out)) {
+      if (k === "done") list.sort((a, b) => b.finished.localeCompare(a.finished));
+      else list.sort((a, b) => rank(a.priority) - rank(b.priority) || a.identifier.localeCompare(b.identifier, "en", { numeric: true }));
+    }
+    return out;
+  }
+
+  // ---- Filters (remembered per viewer).
+  const F = { category: "", size: "", who: "", q: "" };
+  const visible = (c) =>
+    (!F.category || c.category === F.category) && (!F.size || c.size === F.size) &&
+    (!F.who || c.agent === F.who || c.assignee === F.who) &&
+    (!F.q || (c.title + " " + c.identifier).toLowerCase().includes(F.q.toLowerCase()));
+  function fillSelect(sel, values, keep) {
+    const cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    for (const v of values) sel.add(new Option(v, v));
+    sel.value = values.includes(cur) ? cur : keep && values.includes(keep) ? keep : "";
+  }
+
+  // ---- Errors: each code has its own fix.
+  function errorBanner(err, what) {
+    const code = err && err.code;
+    const msg = {
+      needs_reauth: "Your Linear connection has expired. Reconnect Linear in claude.ai Settings → Connectors, then reopen this board.",
+      server_not_connected: "This board reads your PMX project through the Linear connector, and you haven't added it. Add Linear in claude.ai Settings → Connectors, then reopen this board.",
+      selection_required: "You have more than one Linear connection. Choose the one for this board when Claude asks.",
+      blocked_by_policy: "Your organization doesn't allow this board to use Linear.",
+      not_in_manifest: "Linear is turned off for this board.",
+      approval_required: "The board needs your OK to read Linear.",
+      not_granted: "This view can't use connectors. Open the board on claude.ai or in the Claude app.",
+      capability_disabled: "This view can't use connectors. Open the board on claude.ai or in the Claude app.",
+      tool_error: `Linear refused the request: ${err && err.message ? err.message : "no reason given"}.`,
+      bad_shape: "Linear answered in a shape this board doesn't recognize. Update PMX and run /pmx-board again.",
+    }[code] || `Linear didn't answer (${code || "unknown error"}).`;
+    const box = h("div", { class: "banner " + (AUTHZ.includes(code) || code === "tool_error" || code === "bad_shape" ? "err" : "warn"), role: "alert" }, h("span", null, msg));
+    if (code === "approval_required") box.append(h("button", { type: "button", onclick: () => allow(what) }, "Allow Linear"));
+    if (code === "not_in_manifest") box.append(h("button", { type: "button", onclick: managePermissions }, "Open permissions"));
+    return box;
+  }
+  async function managePermissions() {
+    try { const p = await claude.use("permissions"); if (p) await p.manage(); } catch {}
+  }
+  async function allow(what) {
+    try {
+      const r = what === "labels" ? await S.mcp.callTool(LINEAR, "list_issue_labels", LABELS_INPUT) : await S.mcp.callTool(LINEAR, "list_issues", ISSUES_INPUT);
+      what === "labels" ? onLabels({ type: "data", result: r }) : onIssues({ type: "data", result: r });
+    } catch (e) { what === "labels" ? onLabels({ type: "error", error: e }) : onIssues({ type: "error", error: e }); }
+  }
+
+  // ---- Live data.
+  function onIssues(ev) {
+    if (ev.type === "error") {
+      S.issuesErr = ev.error;
+      if (AUTHZ.includes(ev.error && ev.error.code)) S.issues = null; // a denial retracts what we showed
+      return render();
+    }
+    const p = ev.result && ev.result.payload;
+    if (!p || !Array.isArray(p.issues)) { S.issuesErr = { code: "bad_shape" }; return render(); }
+    const gen = ++S.gen;
+    const at = (ev.result.cache && ev.result.cache.storedAt) || Date.now();
+    const finish = (all) => {
+      if (gen !== S.gen) return;
+      S.issues = all; S.issuesAt = at; S.issuesErr = null; S.busy = {};
+      render(); loadPrs();
+    };
+    if (!p.hasNextPage) return finish(p.issues);
+    (async () => {
+      let all = p.issues.slice(), cursor = p.cursor;
+      for (let page = 0; cursor && page < 8; page++) {
+        try {
+          const r = await S.mcp.callTool(LINEAR, "list_issues", { ...ISSUES_INPUT, cursor }, { cache: { staleTime: 30000, gcTime: 600000 } });
+          all = all.concat(r.payload.issues || []);
+          cursor = r.payload.hasNextPage ? r.payload.cursor : null;
+        } catch { break; }
+      }
+      finish(all);
+    })();
+  }
+  function onLabels(ev) {
+    if (ev.type === "error") { S.labelsErr = ev.error; if (AUTHZ.includes(ev.error && ev.error.code)) S.labels = null; return render(); }
+    const p = ev.result && ev.result.payload;
+    S.labels = p && Array.isArray(p.labels) ? p.labels : [];
+    S.labelsErr = null;
+    render();
+  }
+
+  // The PR for a draft in review is the last `pmx:pr <url>` line in its comments.
+  async function loadPrs() {
+    const list = cards().review.filter((c) => !(c.identifier in S.prs));
+    for (const c of list) {
+      S.prs[c.identifier] = null;
+      try {
+        const r = await S.mcp.callTool(LINEAR, "list_comments", { issueId: c.identifier, limit: 100 }, { cache: { staleTime: 300000, gcTime: 3600000 } });
+        const comments = ((r.payload && r.payload.comments) || []).slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+        let url = null;
+        for (const cm of comments) for (const line of (cm.body || "").split("\n")) { const m = /^\s*pmx:pr\s+(https?:\/\/\S+)\s*$/.exec(line); if (m) url = m[1]; }
+        S.prs[c.identifier] = url;
+      } catch { S.prs[c.identifier] = null; }
+    }
+    if (list.length) render();
+  }
+
+  // ---- Triage: the only changes this board makes. Agents, runs and reviews stay in pmx.
+  async function move(card, to, extra) {
+    const L = labelIndex(), st = L.ids["pmx-status"] || {};
+    if (!st[to]) { S.notes[card.uuid] = { err: true, text: `The "${to}" label is missing from the pmx-status group in Linear. Run \`pmx doctor\` to set the labels up.` }; return render(); }
+    const add = [st[to]], remove = [];
+    if (card.labelled && st[card.status]) remove.push(st[card.status]);
+    for (const [g, key] of [["pmx-category", "category"], ["pmx-size", "size"]]) {
+      const want = extra && extra[key];
+      if (!want || want === card[key]) continue;
+      const ids = L.ids[g] || {};
+      if (!ids[want]) continue;
+      if (card[key] && ids[card[key]]) remove.push(ids[card[key]]);
+      add.push(ids[want]);
+    }
+    S.busy[card.uuid] = to; S.open = null; delete S.notes[card.uuid]; render();
+    try {
+      const input = { id: card.identifier, addLabels: add };
+      if (remove.length) input.removeLabels = remove;
+      await S.mcp.callTool(LINEAR, "save_issue", input);
+      S.notes[card.uuid] = { text: to === "ready" ? "Moved to Ready." : "Moved back to the pool." };
+      await S.mcp.invalidate(LINEAR, "list_issues").catch(() => {});
+    } catch (e) {
+      delete S.busy[card.uuid];
+      const code = e && e.code;
+      const text = code === "server_unavailable" || code === "upstream_error" || code === "cancelled"
+        ? "Linear didn't confirm the change. Refresh to see whether it went through before trying again."
+        : code === "approval_required" ? "Linear needs your OK to change issues. Try again and allow it when Claude asks."
+        : code === "tool_error" ? `Linear refused the change: ${e.message || "no reason given"}.`
+        : `The change didn't go through (${code || "unknown error"}).`;
+      S.notes[card.uuid] = { err: true, text };
+      render();
+    }
+  }
+
+  // ---- Rendering.
+  function chip(text, cls, style) { return h("span", { class: "chip " + (cls || ""), style }, text); }
+  function cardEl(c, zone, L) {
+    const busy = S.busy[c.uuid];
+    const el = h("article", { class: "card" + (busy ? " moving" : "") },
+      h("div", { class: "top" },
+        h("a", { class: "id", href: c.url, target: "_blank", rel: "noopener" }, c.identifier),
+        c.priority >= 1 && c.priority <= 4 ? h("span", { class: "prio p" + c.priority, title: PRIORITY[c.priority] + " priority" }, PRIORITY[c.priority]) : null,
+        zone === "inFlight" ? chip(c.status, "st", `background: var(${STATUS_COLOR[c.status]})`) : null),
+      h("div", { class: "title" }, c.title));
+    const chips = h("div", { class: "chips" });
+    if (c.category) chips.append(chip(c.category));
+    if (c.size) chips.append(chip(c.size, "size"));
+    if (c.agent) chips.append(chip("agent " + c.agent));
+    else if (c.assignee) chips.append(chip(c.assignee));
+    if (chips.childNodes.length) el.append(chips);
+    if (zone === "review") {
+      const t = textOf(c.description);
+      if (t) el.append(h("div", { class: "preview" }, t));
+      const pr = S.prs[c.identifier];
+      el.append(h("div", { class: "actions" },
+        pr ? h("a", { href: pr, target: "_blank", rel: "noopener" }, "Open the draft's pull request") : null,
+        h("span", { class: "note" }, "Accept or redo it with pmx review.")));
+    }
+    if (busy) el.append(h("div", { class: "note" }, busy === "ready" ? "Moving to Ready…" : "Moving back to the pool…"));
+    else if (zone === "pool" || zone === "ready") el.append(actionsEl(c, zone, L));
+    const note = S.notes[c.uuid];
+    if (note && !busy) el.append(h("div", { class: "note" + (note.err ? " err" : ""), role: note.err ? "alert" : "status" }, note.text));
+    return el;
+  }
+  function actionsEl(c, zone, L) {
+    const row = h("div", { class: "actions" });
+    if (!S.mcp) return row;
+    if (S.open !== c.uuid) {
+      row.append(h("button", { type: "button", onclick: () => { S.open = c.uuid; render(); } }, zone === "pool" ? "Make ready" : "Back to pool"));
+      return row;
+    }
+    if (zone === "ready") {
+      row.append(h("span", { class: "note" }, "Agents stop picking this up."),
+        h("button", { type: "button", class: "go", onclick: () => move(c, "inbox") }, "Move to pool"),
+        h("button", { type: "button", onclick: () => { S.open = null; render(); } }, "Cancel"));
+      return row;
+    }
+    const cats = Object.keys(L.ids["pmx-category"] || {}).sort();
+    const sizes = SIZES.filter((s) => (L.ids["pmx-size"] || {})[s]);
+    const catSel = h("select", { id: "cat-" + c.uuid, "aria-label": "Category" }, h("option", { value: "" }, "Category…"), cats.map((x) => h("option", { value: x, selected: x === c.category }, x)));
+    const sizeSel = h("select", { id: "size-" + c.uuid, "aria-label": "Size" }, h("option", { value: "" }, "Size…"), sizes.map((x) => h("option", { value: x, selected: x === c.size }, x)));
+    const go = h("button", { type: "button", class: "go" }, "Move to Ready");
+    const sync = () => { go.disabled = !catSel.value || !sizeSel.value; };
+    catSel.addEventListener("change", sync); sizeSel.addEventListener("change", sync); sync();
+    go.addEventListener("click", () => move(c, "ready", { category: catSel.value, size: sizeSel.value }));
+    row.append(catSel, sizeSel, go, h("button", { type: "button", onclick: () => { S.open = null; render(); } }, "Cancel"));
+    return row;
+  }
+
+  function fmtTime(ms) { return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+
+  function render() {
+    $("h-title").textContent = CFG.team ? `${CFG.team} board` : "PMX Board";
+    $("h-sub").replaceChildren(CFG.teamKey ? h("span", null, "Linear team ", h("code", null, CFG.teamKey), " · live through your Linear connector") : "");
+    const banner = $("banner"), board = $("board"), tabs = $("tabs");
+    banner.replaceChildren();
+
+    if (!CFG.projectId) {
+      board.replaceChildren(h("section", { class: "outside" }, h("h2", null, "This board isn't set up yet"), h("p", null, "Run /pmx-board in the Claude app from a machine where PMX is installed. It fills in your team's Linear project and publishes the board.")));
+      return;
+    }
+    if (S.mcp === null) {
+      $("filters").hidden = true; tabs.replaceChildren(); $("refresh").hidden = true;
+      board.replaceChildren(h("section", { class: "outside" },
+        h("h2", null, "Open this board in Claude"),
+        h("p", null, "The PMX board reads your team's Linear project through your own Linear connector, so it works only inside Claude: on claude.ai or in the Claude app."),
+        h("p", null, "If you're already in Claude, check that the Linear connector is added under Settings → Connectors and that this board is allowed to use it.")));
+      return;
+    }
+    if (S.issuesErr) banner.append(errorBanner(S.issuesErr, "issues"));
+    else if (S.labelsErr && S.issues) banner.append(errorBanner(S.labelsErr, "labels"));
+
+    const fresh = $("fresh");
+    fresh.textContent = S.issuesAt ? `Updated ${fmtTime(S.issuesAt)}` : S.mcp ? "Loading from Linear…" : "";
+    $("refresh").hidden = !S.mcp;
+
+    const all = S.issues ? cards() : null;
+    const L = labelIndex();
+    // Filters
+    $("filters").hidden = !all;
+    if (all) {
+      const every = Object.values(all).flat();
+      fillSelect($("f-category"), [...new Set(every.map((c) => c.category).filter(Boolean))].sort(), F.category);
+      fillSelect($("f-size"), SIZES.filter((s) => every.some((c) => c.size === s)), F.size);
+      fillSelect($("f-who"), [...new Set(every.flatMap((c) => [c.agent, c.assignee]).filter(Boolean))].sort(), F.who);
+    }
+    // Phone tabs
+    tabs.replaceChildren(...ZONES.map((z) => h("button", { type: "button", "aria-pressed": z.key === S.zone ? "true" : "false",
+      onclick: () => { S.zone = z.key; store.set("pmx-board-zone", z.key); render(); } },
+      z.title, all ? ` ${all[z.key].filter(visible).length}` : "")));
+
+    board.replaceChildren(...ZONES.map((z) => {
+      const lane = h("section", { class: "lane" + (z.key === S.zone ? " active" : ""), "aria-label": z.title });
+      const list = all ? all[z.key].filter(visible) : null;
+      lane.append(h("h2", null, h("span", { class: "dot", style: `background: var(${z.color})` }), z.title, list ? h("span", { class: "n" }, String(list.length)) : null),
+        h("p", { class: "hint" }, z.hint));
+      const box = h("div", { class: "cards" });
+      if (!list) {
+        if (!S.issuesErr) box.append(h("div", { class: "skeleton" }), h("div", { class: "skeleton" }));
+      } else if (!list.length) {
+        box.append(h("div", { class: "empty" }, F.category || F.size || F.who || F.q ? "Nothing matches the filters." : z.key === "pool" ? "Nothing new. Meetings and digests add work here." : "Nothing here."));
+      } else if (z.key === "ready") {
+        // Group Ready by category, the way agents pick work up.
+        const groups = {};
+        for (const c of list) (groups[c.category || "uncategorized"] ||= []).push(c);
+        for (const [g, cs] of Object.entries(groups).sort()) { box.append(h("div", { class: "group" }, `${g} · ${cs.length}`)); for (const c of cs) box.append(cardEl(c, z.key, L)); }
+      } else {
+        const shown = z.key === "done" ? list.slice(0, DONE_SHOWN) : list;
+        for (const c of shown) box.append(cardEl(c, z.key, L));
+        if (shown.length < list.length) box.append(h("div", { class: "more" }, `${list.length - shown.length} older item(s) in Linear.`));
+      }
+      lane.append(box);
+      return lane;
+    }));
+  }
+
+  // ---- Wiring.
+  for (const [id, key] of [["f-category", "category"], ["f-size", "size"], ["f-who", "who"]]) {
+    $(id).addEventListener("change", (e) => { F[key] = e.target.value; store.set("pmx-board-f-" + key, F[key]); render(); });
+    F[key] = store.get("pmx-board-f-" + key) || "";
+  }
+  $("f-q").addEventListener("input", (e) => { F.q = e.target.value; render(); });
+  $("refresh").addEventListener("click", async () => {
+    if (!S.mcp) return;
+    S.prs = {};
+    await S.mcp.invalidate(LINEAR).catch(() => {});
+  });
+
+  render();
+  if (!CFG.projectId) return;
+  const use = window.claude && typeof window.claude.use === "function" ? window.claude.use("mcp") : Promise.resolve(null);
+  use.then((mcp) => {
+    S.mcp = mcp || null;
+    render();
+    if (!mcp) return;
+    mcp.watchTool(LINEAR, "list_issue_labels", LABELS_INPUT, onLabels, { cache: { staleTime: 600000, gcTime: 86400000 }, refetchInterval: 600000 });
+    mcp.watchTool(LINEAR, "list_issues", ISSUES_INPUT, onIssues, { cache: { staleTime: 30000, gcTime: 86400000 }, refetchInterval: 60000 });
+  }, () => { S.mcp = null; render(); });
+})();
+</script>

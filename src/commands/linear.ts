@@ -1,5 +1,6 @@
 import { formatTasks, tasksJson } from "../claude/tasks.js";
-import { appSkillTarget, installAppSkill } from "../claude/skill.js";
+import { boardJson, checkBoard, formatBoard, renderBoard, setBoardUrl, boardUrl } from "../claude/board.js";
+import { appSkillInstalled, appSkillTarget, BOARD_SKILL, installAppSkill } from "../claude/skill.js";
 import { exec } from "../core/exec.js";
 import { macKeychain } from "../core/keychain.js";
 import { linearLogin, linearLogout, readGrant } from "../linear/oauth.js";
@@ -75,6 +76,44 @@ export const linearCommands: Command[] = [
       }
       const ctx = await a.ctx().catch(() => null);
       console.log(a.values.json ? JSON.stringify(await tasksJson(ctx?.team ?? null, macKeychain()), null, 2) : await formatTasks(ctx?.team ?? null, macKeychain()));
+      return 0;
+    },
+  },
+  {
+    name: "board",
+    summary: "The team board as a live Claude artifact, read through each viewer's Linear connector; type /pmx-board in the Claude app to publish it",
+    usage: "pmx board [--open] | pmx board --json | pmx board --html | pmx board --set-url <link> | pmx board --install-skill",
+    options: { json: { type: "boolean" }, html: { type: "boolean" }, open: { type: "boolean" }, "set-url": { type: "string" }, "install-skill": { type: "boolean" } },
+    async run(a) {
+      if (a.values["install-skill"]) {
+        const r = await installAppSkill(BOARD_SKILL);
+        console.log(r === "kept-yours"
+          ? `${appSkillTarget(BOARD_SKILL)} exists and wasn't written by PMX, so it was left alone.`
+          : `${r === "current" ? "Already up to date" : r === "updated" ? "Updated" : "Installed"}: type /pmx-board in the Claude app to publish the team board.`);
+        return r === "kept-yours" ? 1 : 0;
+      }
+      const ctx = await a.ctx();
+      if (a.values.json) {
+        console.log(JSON.stringify(await boardJson(ctx.team, ctx.personal), null, 2));
+        return 0;
+      }
+      if (a.values["set-url"]) {
+        await setBoardUrl(ctx.personal, String(a.values["set-url"]), ctx.now());
+        console.log(`Saved. \`pmx board --open\` and \`pmx canvas\` now open ${ctx.personal.board!.url}.`);
+        return 0;
+      }
+      const e = await checkBoard(ctx.team);
+      if (a.values.html) {
+        if (!e.ok) throw new Error(e.reason);
+        console.log(await renderBoard(ctx.team));
+        return 0;
+      }
+      const existing = boardUrl(ctx.team, ctx.personal);
+      if (a.values.open && existing) {
+        await openUrl(existing.url);
+        return 0;
+      }
+      console.log(formatBoard(ctx.team, ctx.personal, e, await appSkillInstalled(BOARD_SKILL)));
       return 0;
     },
   },
