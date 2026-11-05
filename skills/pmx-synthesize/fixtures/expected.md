@@ -1,0 +1,1 @@
+{"tasks": [{"title": "Draft a one-pager for SCIM sync", "category": "spec", "size": "M", "rationale": "Multi-workspace admins spend about two hours on SSO per workspace and use a CSV workaround.", "sources": ["T1"]}]}

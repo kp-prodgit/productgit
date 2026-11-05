@@ -1,0 +1,11 @@
+{
+  "name": "productgit",
+  "owner": { "name": "Product Git", "email": "kp@productgit.com" },
+  "plugins": [
+    {
+      "name": "productgit",
+      "source": "./",
+      "description": "Product Git skills for product teams: digest, synthesis, research, competitive, hygiene and spec drafting."
+    }
+  ]
+}

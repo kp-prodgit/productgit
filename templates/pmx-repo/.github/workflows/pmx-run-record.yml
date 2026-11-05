@@ -1,0 +1,30 @@
+# Rejects PRs that add agent outputs without a clean run record (B5, NEUT-3).
+name: PMX run record
+on:
+  pull_request:
+    paths: ["outputs/**", ".pmx/runs/**"]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ github.base_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The CLI comes from the base branch, never from the PR: a package is a binary diff no one can
+      # review, so a PR must not be able to swap in a CLI that passes its own check.
+      - name: Install the PMX CLI from the base branch
+        run: |
+          if git cat-file -e "origin/$BASE:.pmx/cli/productgit.tgz" 2>/dev/null; then
+            git show "origin/$BASE:.pmx/cli/productgit.tgz" > "$RUNNER_TEMP/productgit.tgz"
+            npm install -g "$RUNNER_TEMP/productgit.tgz"
+          else
+            npm install -g productgit@{{PMX_VERSION}}
+          fi
+      - run: pmx verify-record --base "origin/$BASE"

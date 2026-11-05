@@ -1,0 +1,9 @@
+# Shared skills, team memory and team config change only with a code owner's review (SEC-5, Q11).
+# Replace the handles with your Head of Product and one named PM, then require code-owner review
+# in the branch protection rule for main.
+/.claude/          @HEAD-OF-PRODUCT @NAMED-PM
+/memory/           @HEAD-OF-PRODUCT @NAMED-PM
+/pmx.config.json   @HEAD-OF-PRODUCT @NAMED-PM
+/CODEOWNERS        @HEAD-OF-PRODUCT
+/.pmx/cli/         @HEAD-OF-PRODUCT
+/.github/          @HEAD-OF-PRODUCT

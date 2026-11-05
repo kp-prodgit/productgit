@@ -1,0 +1,24 @@
+Product Git Commercial License
+
+Copyright 2026 Kaustubh Page. All rights reserved.
+
+The software in this directory ("ee/") is source-available but is not open
+source. It provides Product Git team features: the cloud lease service client,
+review caps and auto-pause, admin policy, license checks and content-free ledger
+sync.
+
+You may read, copy and modify this software for evaluation and to contribute
+changes back. You may use it in production only with a valid Product Git
+subscription for the number of seats in your license, or during an evaluation
+period of up to 60 days.
+
+You may not sell, sublicense, or offer this software, or a service built on it,
+to third parties, and you may not remove or circumvent the license checks.
+
+Everything outside ee/ is licensed under the Apache License, Version 2.0.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+
+Contact: kp@productgit.com

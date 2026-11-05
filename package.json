@@ -1,0 +1,39 @@
+{
+  "name": "productgit",
+  "version": "0.4.0",
+  "description": "Product Git: synthesize product signals into sized work and let each PM's agent draft it, paced by human review.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "pmx": "dist/src/cli.js",
+    "productgit": "dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "templates",
+    "ee/LICENSE",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/src/cli.js",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pmx": "node dist/src/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kp-prodgit/productgit.git"
+  },
+  "homepage": "https://productgit.com",
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

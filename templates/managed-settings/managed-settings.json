@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "autoMemoryEnabled": false,
+  "disableClaudeAiConnectors": true,
+  "syncClaudeAiSkills": false,
+  "syncClaudeAiPlugins": false,
+  "enableAllProjectMcpServers": false,
+  "availableModels": ["claude-sonnet-5-5"],
+  "strictKnownMarketplaces": [{ "source": "github", "repo": "kp-prodgit/productgit" }],
+  "enabledPlugins": { "productgit@productgit": true },
+  "allowManagedHooksOnly": true,
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "blockReadsOutsideWorkingDirectories": true,
+    "blockWritesOutsideWorkingDirectories": true
+  },
+  "sandbox": { "enabled": true, "allowUnsandboxedCommands": false },
+  "env": { "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false" }
+}
