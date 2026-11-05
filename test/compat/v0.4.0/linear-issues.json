@@ -1,0 +1,4 @@
+{"data":{"project":{"issues":{"nodes":[
+  {"id":"i1","identifier":"PMX-1","title":"Draft a one-pager for SCIM sync","description":"pmx:source T1","url":"https://linear.app/x/PMX-1","priority":2,"createdAt":"2026-11-01T00:00:00Z","project":{"id":"p1"},
+   "labels":{"nodes":[{"id":"l1","name":"ready","parent":{"name":"pmx-status"}},{"id":"l2","name":"spec","parent":{"name":"pmx-category"}},{"id":"l3","name":"M","parent":{"name":"pmx-size"}}]}}
+],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}

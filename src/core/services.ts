@@ -4,6 +4,7 @@ import { linearTracker } from "../tracker/linear.js";
 import { memoryTracker, type Tracker } from "../tracker/types.js";
 import type { Ctx } from "./context.js";
 import type { PersonalConfig, TeamConfig } from "./config.js";
+import { assertTeamVersion } from "./version.js";
 
 export interface Services {
   tracker: Tracker;
@@ -47,6 +48,8 @@ export function registerServices(o: { tracker?: Factory<Tracker>; lease?: Factor
 }
 
 export async function services(ctx: Ctx, test?: Partial<Services>): Promise<Services> {
+  // Everything that reaches the tracker or leases is shared team work (COMPAT-2).
+  assertTeamVersion(ctx.team);
   const tracker = test?.tracker ?? (await overrides.tracker?.(ctx)) ?? (await defaultTracker(ctx));
   const lease = test?.lease ?? (await overrides.lease?.(ctx)) ?? gitRefLease(ctx.repo, ctx.now);
   return {

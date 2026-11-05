@@ -1,0 +1,4 @@
+{"type":"run","ts":"2026-11-03T10:00:00.000Z","agent":"ana@m1","machine":"m1","prev":null,"hash":"h1","taskId":"PMX-1","category":"spec","size":"M","skill":"pmx-spec","skillVersion":"abc","outcome":"ok","durationMs":1000,"tokens":100,"costUsd":0.4,"runtime":"claude-code"}
+{"type":"verdict","ts":"2026-11-03T11:00:00.000Z","agent":"ana@m1","machine":"m1","prev":"h1","hash":"h2","taskId":"PMX-1","category":"spec","size":"M","verdict":"accepted","reviewMinutes":4,"editSize":null}
+{"type":"release","ts":"2026-11-03T12:00:00.000Z","agent":"ana@m1","machine":"m1","prev":"h2","hash":"h3","taskId":"PMX-2","reason":"stale"}
+{"type":"unpause","ts":"2026-11-03T13:00:00.000Z","agent":"ana@m1","machine":"m1","prev":"h3","hash":"h4","category":"spec"}

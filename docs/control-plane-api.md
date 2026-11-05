@@ -15,6 +15,13 @@ The contract between the `pmx` CLI (the free client in `src/cloud/`, Apache-2.0,
 | Roles | `admin` or `member`, per org. |
 | Clock | All times are ISO-8601 UTC strings. |
 
+## Versions (COMPAT-5)
+
+- **The API is `/v1`, and `/v1` only grows.** New routes, new optional request fields, new response fields and new event types are fine. Removing or renaming a field, changing its meaning, or making an optional field required is not: that needs `/v2`, served alongside `/v1` for at least 6 months.
+- **The CLI says its version.** Every CLI request carries `x-pmx-version: <semver>` (from 0.5.0). Requests without it (browsers, older CLIs) are never refused for their version.
+- **The server says the latest and minimum versions.** When configured, every response carries `x-pmx-latest-version` and `x-pmx-min-version`. `pmx doctor` warns when a newer release exists.
+- **Too old is refused clearly.** A CLI below the minimum gets `426 { "error": "cli_too_old", "message", "min", "latest" }` and tells the PM to run `pmx update`. Raise the minimum only after the release that replaces it has been out for a full deprecation window (30 days by default), and only for a reason older CLIs can't work around.
+
 ## Plans (PLAN-1 to PLAN-4)
 
 Every signed-in user gets a **free** org. The UI is free; team analytics and the brain are paid.

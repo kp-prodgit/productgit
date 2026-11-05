@@ -1,3 +1,6 @@
+import { loadState } from "../core/state.js";
+import { VENDORED_CLI } from "../core/vendor.js";
+import { atLeast, compareVersions, currentVersion, vendoredVersion } from "../core/version.js";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { PersonalConfig, TeamConfig } from "../core/config.js";
@@ -59,6 +62,16 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   add("skill.pmx-digest", digestSkill, "shared skill pmx-digest in .claude/skills", "warn");
 
   for (const c of await profileChecks(d.team)) add(c.id, c.ok, c.detail);
+
+  // Versions (COMPAT-2, COMPAT-5): too old for the team fails; a newer team or release package warns.
+  const current = currentVersion();
+  const min = d.team.cli?.min;
+  add("cli.team-minimum", !min || atLeast(current, min), min ? `pmx ${current}; team minimum ${min}${atLeast(current, min) ? "" : ": run `pmx update`"}` : `pmx ${current}; no team minimum set (\`pmx vendor --require\` sets one)`);
+  const vendored = await vendoredVersion(join(repo, VENDORED_CLI), d.exec);
+  add("cli.team-package", !vendored || !((compareVersions(vendored, current) ?? 0) > 0),
+    vendored ? `team package is pmx ${vendored}${(compareVersions(vendored, current) ?? 0) > 0 ? ": run `pmx update`" : ""}` : `no CLI package in the PMX repo (\`pmx vendor\`)`, "warn");
+  const cloud = (await loadState()).cloudVersions;
+  if (cloud?.latest) add("cli.latest", (compareVersions(cloud.latest, current) ?? 0) <= 0, `latest release is pmx ${cloud.latest}`, "warn");
 
   const loose: string[] = [];
   for (const dir of [paths.home(), paths.staging(), paths.receipts(), paths.transcripts()]) {

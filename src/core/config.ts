@@ -1,3 +1,4 @@
+import { assertSchema, isVersion } from "./version.js";
 import { join } from "node:path";
 import { readJson, writeJson } from "./fsutil.js";
 import { paths, TEAM_CONFIG_FILE } from "./paths.js";
@@ -30,6 +31,8 @@ export interface TeamConfig {
   autoPause: { minVerdicts: number; threshold: number; windowDays: number };
   controlPlane?: { url: string; orgId: string };
   /** Company roll-up (COMPANY-1): this repo's tracker is the company project; these are the teams it merges. */
+  /** The oldest pmx allowed to do shared team work (COMPAT-2). Set it with `pmx vendor --require`. */
+  cli?: { min: string } | null;
   company?: { teams: { name: string; teamKey: string; projectId: string }[]; machine: string | null } | null;
 }
 
@@ -94,7 +97,9 @@ export async function loadTeamConfig(repoPath: string): Promise<TeamConfig> {
 }
 
 export function validateTeamConfig(c: TeamConfig): TeamConfig {
+  assertSchema("teamConfig", c.version, TEAM_CONFIG_FILE);
   const problems: string[] = [];
+  if (c.cli && !isVersion(c.cli.min)) problems.push(`cli.min must be a version like 0.5.0, not "${c.cli.min}"`);
   if (!c.model) problems.push("model must be set (NEUT-1)");
   for (const s of SIZES) if (!c.sizes?.[s]) problems.push(`sizes.${s} missing`);
   for (const [cat, v] of Object.entries(c.categories ?? {}))
@@ -107,6 +112,7 @@ export function validateTeamConfig(c: TeamConfig): TeamConfig {
 export async function loadPersonalConfig(): Promise<PersonalConfig> {
   const c = await readJson<PersonalConfig>(paths.config());
   if (!c) throw new Error("Not set up on this machine. Run `pmx init`.");
+  assertSchema("personalConfig", c.version, paths.config());
   return c;
 }
 

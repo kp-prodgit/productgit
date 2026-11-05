@@ -1,5 +1,17 @@
 # Changelog
 
+Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
+
+## 0.5.0: explainable runs, free hosted app, brain, meetings from connectors, safe updates
+
+Everything since 0.4.0, which shipped several times under that number:
+
+- **Explainable runs (PRIV-4):** `pmx explain [--web]` and `pmx skills`: what each run read, left out, cut and masked, which skills ran, and why each task got its size.
+- **Free hosted app (PLAN-1 to PLAN-4, PRIV-5):** `pmx login` signs in for free and creates the team's org; the board is free; content-free analytics start only after sign-in (`pmx analytics`).
+- **The brain (BRAIN-1 to BRAIN-5, Team plan):** `pmx brain` proposes actions; fixed rules decide what's done, queued or only suggested; every action is commented and explained.
+- **Meetings from Claude connectors (COLLECT, MEET, TODO, COMPANY):** `pmx collect`, a meeting ledger in Linear so no meeting is processed twice, private `pmx todo`, and `pmx company` roll-ups.
+- **Safe updates (COMPAT-1 to COMPAT-5):** `pmx update`, `pmx vendor --require` for a team minimum version, files from a newer pmx are refused instead of misread, compatibility tests against what 0.4.0 wrote, and a version handshake with the hosted app.
+
 ## 0.4.0 (M5): control plane client, canvas and managed settings
 
 Team-plan features in `ee/` (commercial license), against the API in `docs/05-control-plane-api.md`:

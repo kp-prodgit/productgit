@@ -1,3 +1,4 @@
+import { SCHEMA } from "./version.js";
 import { createHash } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -124,7 +125,9 @@ const stamp = (id: string) => id.split("-").pop()!;
 /** `id` must be a listed receipt ID, never a path. */
 export async function readReceipt(id: string): Promise<RunReceipt | null> {
   if (!ID.test(id) || !(await listReceipts()).includes(id)) return null;
-  return readJson<RunReceipt>(join(paths.receipts(), `${id}.json`));
+  const r = await readJson<RunReceipt>(join(paths.receipts(), `${id}.json`));
+  // A receipt from a newer pmx is skipped rather than misread (COMPAT-3).
+  return r && r.v <= SCHEMA.receipt ? r : null;
 }
 
 async function pruneReceipts(now: Date): Promise<void> {

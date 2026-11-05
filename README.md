@@ -42,7 +42,8 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `pull` | Claim the best ready task that fits budget, hours and the review cap, and run it (dry run in week one) |
 | `claim` / `release` | Claim a specific task; give one back; `--stale` releases expired claims |
 | `verify-record` | CI check: every output PR carries a clean run record |
-| `vendor` | Put this CLI's package in the PMX repo, so teammates and CI install the same version |
+| `vendor` | Put this CLI's package in the PMX repo, so teammates and CI install the same version; `--require` makes it the team minimum |
+| `update` | Install your team's version from the PMX repo; `--check` only compares |
 | `neutrality` | Run skill fixtures in a clean profile; `--compare` two machines' reports |
 | `review` | Accept, reject or redo-with-note in the terminal, or `--web` for a local review page; `--stats` for accept rates |
 | `login` | Sign in to the free hosted app; creates your team's free org if there isn't one |
@@ -52,6 +53,15 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `policy` / `license` | Team plan (`ee/`): show the applied admin policy, show or refresh the license |
 | `tick` | One scheduler pass (launchd runs it every 30 minutes) |
 | `uninstall` | Remove the job, profile, keychain items and `~/.pmx` |
+
+## Updating
+
+Your team's PMX repo holds the CLI package everyone installs (`.pmx/cli/productgit.tgz`), so a team moves to a new version together.
+
+- **The team lead:** after installing a new release, run `pmx vendor --require` and merge that PR. It stores the new package and makes it the team's minimum version.
+- **Everyone else:** run `pmx update`. It pulls the PMX repo and installs the team's version. `pmx doctor` says when you're behind.
+- **If you don't update:** your digest, to-dos and `pmx explain` keep working, but shared team work (suggesting tasks, pulling, the brain, the company roll-up) stops with a message until you do. That way an old version never writes something the rest of the team's versions would misread.
+- **What never breaks within a major version:** shared files and Linear labels only gain things; a file written by a newer pmx is refused, not misread; every release is tested against files older releases wrote; and the hosted API only adds to `/v1`. Details in [docs/control-plane-api.md](docs/control-plane-api.md) ("Versions").
 
 ## Free and paid
 

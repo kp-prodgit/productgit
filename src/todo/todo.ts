@@ -7,6 +7,7 @@ import { DATA_RULES, dataBlock } from "../core/prompt.js";
 import { newReceiptId, writeReceipt, type RunReceipt } from "../core/receipt.js";
 import { loadSkill, skillBody } from "../core/skills.js";
 import { updateState } from "../core/state.js";
+import { assertSchema } from "../core/version.js";
 import { gather } from "../digest/gather.js";
 import { localDay, startOfDay } from "../meetings/ledger.js";
 
@@ -36,7 +37,10 @@ const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").tri
 const line = (s: unknown, max: number) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 export async function loadTodos(): Promise<Store> {
-  return (await readJson<Store>(paths.todos())) ?? { v: 1, processed: {}, items: [] };
+  const s = (await readJson<Store>(paths.todos())) ?? { v: 1, processed: {}, items: [] };
+  // Never rewrite a to-do file a newer pmx wrote: an old CLI would drop what it doesn't know (COMPAT-3).
+  assertSchema("todos", s.v, paths.todos());
+  return s;
 }
 
 async function saveTodos(s: Store): Promise<void> {

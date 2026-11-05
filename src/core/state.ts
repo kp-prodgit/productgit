@@ -13,9 +13,11 @@ export interface State {
   lastBrainAt: string | null;
   lastCollectAt: string | null;
   lastRollupAt: string | null;
+  /** What the hosted app last said about CLI versions (COMPAT-5). */
+  cloudVersions: { latest: string | null; min: string | null; seenAt: string } | null;
 }
 
-const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null };
+const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null, cloudVersions: null };
 
 export async function loadState(): Promise<State> {
   return { ...EMPTY, ...((await readJson<Partial<State>>(paths.state())) ?? {}) };
