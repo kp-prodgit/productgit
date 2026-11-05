@@ -1,3 +1,4 @@
+import { appSkillInstalled, appSkillTarget, installAppSkill } from "../claude/skill.js";
 import { createHash } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { hostname, homedir } from "node:os";
@@ -167,8 +168,15 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   }
   if (d.invite && d.onInvite) await d.onInvite(d.invite);
 
+  // CLAUDE-2: a /pmx-schedule command in the PM's own Claude app, which creates PMX's scheduled tasks.
+  if (await ask.confirm("Add a /pmx-schedule command to your Claude app, so Claude can create PMX's scheduled tasks for you?", true)) {
+    const r = await installAppSkill().catch(() => null);
+    if (r === "kept-yours") out.warn(`Left your own ${appSkillTarget()} alone.`);
+  }
   out.info("\nSetup done. The first week runs pulls as dry runs, so you can see what your agent would do.");
   out.info(`Next: put call transcripts in ${transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
-  out.info("Then set up PMX's tasks in your Claude app, which collect meetings from your connectors (and talk to Linear if you didn't sign in): run `pmx schedule` and paste what it prints into the Claude app.");
+  out.info((await appSkillInstalled())
+    ? "Then, in the Claude desktop app, type /pmx-schedule: Claude creates PMX's scheduled tasks (meeting collection, and the Linear sync if you didn't sign in)."
+    : "Then set up PMX's tasks in your Claude app: run `pmx schedule` and paste what it prints into the Claude app.");
   return personal;
 }

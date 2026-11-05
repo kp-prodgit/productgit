@@ -1,4 +1,5 @@
 import { neededTasks, taskExists } from "../claude/tasks.js";
+import { appSkillInstalled } from "../claude/skill.js";
 import { loadState } from "../core/state.js";
 import { VENDORED_CLI } from "../core/vendor.js";
 import { atLeast, compareVersions, currentVersion, vendoredVersion } from "../core/version.js";
@@ -72,8 +73,9 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   add("cli.team-package", !vendored || !((compareVersions(vendored, current) ?? 0) > 0),
     vendored ? `team package is pmx ${vendored}${(compareVersions(vendored, current) ?? 0) > 0 ? ": run `pmx update`" : ""}` : `no CLI package in the PMX repo (\`pmx vendor\`)`, "warn");
   // Claude tasks (CLAUDE-1): PMX can't create them, so doctor says which are missing.
+  const fix = (await appSkillInstalled()) ? "type /pmx-schedule in the Claude app" : "run `pmx schedule`";
   for (const t of await neededTasks(d.team, d.keychain))
-    add(`claude.task.${t.id}`, await taskExists(t.id), `Claude scheduled task "${t.title}"${(await taskExists(t.id)) ? "" : " is missing: run `pmx schedule`"}`, "warn");
+    add(`claude.task.${t.id}`, await taskExists(t.id), `Claude scheduled task "${t.title}"${(await taskExists(t.id)) ? "" : ` is missing: ${fix}`}`, "warn");
   const st = await loadState();
   if (d.team.cli?.autoUpdate) {
     const au = st.autoUpdate;

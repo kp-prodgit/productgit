@@ -36,7 +36,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `explain` | How a run decided: what was found, used, left out, cut and masked, which skills and model ran, why each task got its size, and the cost. `--web` opens a local page |
 | `skills` | The Claude skills PMX can use, what each does, when it runs, and whether your team's copy differs from the built-in one |
 | `linear` | Connect to Linear: `login` (browser sign-in, no API key), `logout`, `status`; with neither a key nor a sign-in, Claude relays through its Linear connector |
-| `schedule` | The scheduled tasks PMX needs in your Claude app, whether each exists, and the request to paste so Claude creates them |
+| `schedule` | The scheduled tasks PMX needs in your Claude app and whether each exists; `--install-skill` adds `/pmx-schedule`, which creates them from inside the Claude app |
 | `collect` | Meeting transcripts from your Claude connectors (Granola, Fireflies…): `--prompt` prints the scheduled task's instructions, `--check` validates what it saved |
 | `todo` | Your own to-dos from your meetings, including 1:1s; never leaves your Mac. `--refresh` reads today's unread meetings, `done <id>` checks one off |
 | `synthesize` | Today's unprocessed team meetings (and Slack) → sized tasks in the Linear PMX inbox; each meeting is lodged in Linear and marked done so it's never processed twice |
@@ -65,7 +65,7 @@ PMX reaches Linear in the first way available on each machine:
 3. **The hosted app's Linear connection**, on teams that use it.
 4. **Claude**, through the Linear connector in your Claude app. A scheduled task applies the exact changes PMX queued and brings back the PMX project. PMX checks every result and keeps all the rules in its own code; Claude only carries the changes. Changes reach Linear at the next sync (hourly on weekdays), not instantly.
 
-PMX can't create tasks in your Claude app itself. Run `pmx schedule` to see which ones this machine needs (meeting collection, and the Linear sync when you use option 4), and paste what it prints into the Claude app.
+PMX can't create tasks in your Claude app itself, but Claude can. `pmx init` offers to add a `/pmx-schedule` command to your Claude app (or run `pmx schedule --install-skill`). Type `/pmx-schedule` in the Claude desktop app and Claude creates the tasks this machine needs (meeting collection, and the Linear sync when you use option 4), with one approval. `pmx schedule` shows what's set up.
 
 ## Updating
 

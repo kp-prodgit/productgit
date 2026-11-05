@@ -1,8 +1,8 @@
 import { stat } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { TeamConfig } from "../core/config.js";
 import type { Keychain } from "../core/keychain.js";
+import { appSkillInstalled, claudeAppHome } from "./skill.js";
 
 /**
  * The scheduled tasks PMX needs in the PM's Claude app (CLAUDE-1). PMX can't create them: the app keeps
@@ -59,7 +59,7 @@ export async function neededTasks(team: TeamConfig | null, keychain: Keychain): 
 }
 
 /** Where the Claude app keeps each scheduled task's file. The schedule itself lives in the app. */
-export const taskFile = (id: string) => join(homedir(), ".claude", "scheduled-tasks", id, "SKILL.md");
+export const taskFile = (id: string) => join(claudeAppHome(), "scheduled-tasks", id, "SKILL.md");
 
 export async function taskExists(id: string): Promise<boolean> {
   return stat(taskFile(id)).then(() => true, () => false);
@@ -72,6 +72,18 @@ export function pasteRequest(t: ClaudeTask): string {
 ${t.prompt}`;
 }
 
+/** What `/pmx-schedule` reads (`pmx schedule --json`): the tasks to create, in the scheduled-tasks tool's terms. */
+export async function tasksJson(team: TeamConfig | null, keychain: Keychain) {
+  const need = await neededTasks(team, keychain);
+  const missing = [];
+  const present = [];
+  for (const t of need) {
+    if (await taskExists(t.id)) present.push(t.id);
+    else missing.push({ taskId: t.id, title: t.title, description: `Product Git: ${t.why}.`, cronExpression: t.cron, prompt: t.prompt });
+  }
+  return { missing, present };
+}
+
 export async function formatTasks(team: TeamConfig | null, keychain: Keychain): Promise<string> {
   const need = await neededTasks(team, keychain);
   const lines: string[] = [];
@@ -82,9 +94,10 @@ export async function formatTasks(team: TeamConfig | null, keychain: Keychain): 
   const missing = [];
   for (const t of need) if (!(await taskExists(t.id))) missing.push(t);
   if (!missing.length) return [...lines, "", "Every Claude task this machine needs is set up. Manage them under Scheduled in the Claude app."].join("\n");
+  if (await appSkillInstalled())
+    lines.push("", "To create them, open the Claude desktop app (Code tab), start a session and type /pmx-schedule. Claude creates each missing task and asks you to approve once.", "", "Or paste this instead:");
+  else lines.push("", "PMX can't create Claude tasks itself. Run `pmx schedule --install-skill` once to add a /pmx-schedule command to your Claude app, or open the Claude desktop app (Code tab), start a session, and paste this:");
   lines.push(
-    "",
-    "PMX can't create Claude tasks itself. Open the Claude desktop app (Code tab), start a session, and paste this:",
     "",
     ...missing.map((t) => `----------\n${pasteRequest(t)}`),
     "----------",

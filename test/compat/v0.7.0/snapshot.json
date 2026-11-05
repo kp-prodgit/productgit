@@ -1,0 +1,41 @@
+{
+ "v": 1,
+ "syncedAt": "2026-11-05T07:34:40.633Z",
+ "projectId": "proj-1",
+ "issues": [
+  {
+   "id": "uuid-1",
+   "identifier": "PRO2-20",
+   "title": "Verify Linear Agent capabilities",
+   "description": "pmx:source docs/04.md",
+   "url": "https://linear.app/x/PRO2-20",
+   "priority": 2,
+   "createdAt": "2026-11-04T21:34:18.286Z",
+   "labels": {
+    "nodes": [
+     {
+      "name": "M",
+      "parent": {
+       "name": "pmx-size"
+      }
+     },
+     {
+      "name": "competitive-analysis",
+      "parent": {
+       "name": "pmx-category"
+      }
+     },
+     {
+      "name": "inbox",
+      "parent": {
+       "name": "pmx-status"
+      }
+     }
+    ]
+   },
+   "comments": {
+    "nodes": []
+   }
+  }
+ ]
+}

@@ -2,6 +2,14 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.8.0: /pmx-schedule in your Claude app
+
+- **`/pmx-schedule` (CLAUDE-2).** PMX can't reach the Claude app's scheduling tool, but Claude can from inside an app session. `pmx init` offers to add a `/pmx-schedule` skill to your personal Claude skills (or run `pmx schedule --install-skill`). Type it in the Claude app and Claude creates each scheduled task this machine is missing, exactly as PMX lists them (`pmx schedule --json`), with one approval. PMX refreshes its own copy and never overwrites a skill you wrote.
+- `pmx schedule`, `pmx init` and `pmx doctor` point to `/pmx-schedule` once it's installed; the paste-in text stays as a fallback.
+- Tests no longer touch the real `~/.claude` (`PMX_CLAUDE_HOME`).
+- The Claude plugin's version now matches the CLI.
+- Compatibility fixtures for relay files as 0.7.0 wrote them (COMPAT-4).
+
 ## 0.7.0: Linear without an API key, and Claude tasks you can see
 
 - **`pmx linear login` (LINEAR-1).** Sign in to Linear in the browser (OAuth with PKCE, no client secret). The access lives in the keychain and renews itself every 24 hours. `pmx linear logout` revokes it; `pmx linear status` shows how this machine reaches Linear.

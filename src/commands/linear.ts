@@ -1,4 +1,5 @@
-import { formatTasks } from "../claude/tasks.js";
+import { formatTasks, tasksJson } from "../claude/tasks.js";
+import { appSkillTarget, installAppSkill } from "../claude/skill.js";
 import { exec } from "../core/exec.js";
 import { macKeychain } from "../core/keychain.js";
 import { linearLogin, linearLogout, readGrant } from "../linear/oauth.js";
@@ -61,11 +62,19 @@ export const linearCommands: Command[] = [
   },
   {
     name: "schedule",
-    summary: "The scheduled tasks PMX needs in your Claude app, whether each exists, and the request to paste so Claude creates them",
-    options: {},
+    summary: "The scheduled tasks PMX needs in your Claude app and whether each exists; type /pmx-schedule in the Claude app to create them",
+    usage: "pmx schedule [--json] | pmx schedule --install-skill",
+    options: { json: { type: "boolean" }, "install-skill": { type: "boolean" } },
     async run(a) {
+      if (a.values["install-skill"]) {
+        const r = await installAppSkill();
+        console.log(r === "kept-yours"
+          ? `${appSkillTarget()} exists and wasn't written by PMX, so it was left alone.`
+          : `${r === "current" ? "Already up to date" : r === "updated" ? "Updated" : "Installed"}: type /pmx-schedule in the Claude app to create PMX's scheduled tasks.`);
+        return r === "kept-yours" ? 1 : 0;
+      }
       const ctx = await a.ctx().catch(() => null);
-      console.log(await formatTasks(ctx?.team ?? null, macKeychain()));
+      console.log(a.values.json ? JSON.stringify(await tasksJson(ctx?.team ?? null, macKeychain()), null, 2) : await formatTasks(ctx?.team ?? null, macKeychain()));
       return 0;
     },
   },

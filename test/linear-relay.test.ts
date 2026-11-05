@@ -167,7 +167,7 @@ describe("choosing how to reach Linear", () => {
 describe("Claude tasks PMX needs (CLAUDE-1)", () => {
   beforeEach(async () => {
     await freshHome();
-    process.env.HOME = await tmp("home-");
+    process.env.PMX_CLAUDE_HOME = await tmp("claude-home-");
   });
 
   it("needs the Linear sync only when nothing else reaches Linear, and prints a request to paste", async () => {
