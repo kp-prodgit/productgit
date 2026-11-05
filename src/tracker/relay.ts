@@ -211,6 +211,7 @@ Write ${files.snapshot()} as this JSON, with every issue in project ${projectId}
    "labels": {"nodes": [{"name": "ready", "parent": {"name": "pmx-status"}}]},
    "comments": {"nodes": [{"body": "<only comments that contain a line starting with pmx:>"}]}}
 ]}
+The connector may list labels by name only and shorten long descriptions. Look up each label's group in team ${teamKey}'s label list (\`parent\` is the group, for example pmx-status), and fetch the full description of any issue whose description was shortened. Never guess a group or shorten a description.
 
 ## 3. Finish
 Run \`pmx linear relay --check\` and report what it prints. Don't change anything else in Linear or in any other app.`;

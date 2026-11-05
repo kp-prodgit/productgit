@@ -40,7 +40,7 @@ export const LINEAR_SYNC_TASK: ClaudeTask = {
   title: "PMX: sync Linear through Claude",
   schedule: "every hour from 8:00 to 18:00 on weekdays",
   cron: "0 8-18 * * 1-5",
-  why: "PMX has no Linear key or sign-in on this machine, so Claude carries its changes to Linear and brings back the project",
+  why: "carries PMX's changes to Linear and brings back the project, because this machine has no Linear key or sign-in",
   prompt: `You are syncing Product Git (PMX) with Linear on this Mac. Product Git is a command-line tool installed as \`pmx\`.
 
 1. Run \`pmx linear relay --prompt\` in a shell. It prints this run's exact instructions: which Linear project to use, the changes PMX queued, and how to export the project.
