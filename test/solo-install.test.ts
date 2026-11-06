@@ -187,7 +187,9 @@ describe("0.10.0: a solo install that works", () => {
     expect(guide).toContain(`releases/download/v${v}/SHA256SUMS`);
     expect(guide.indexOf("auto mode off")).toBeLessThan(guide.indexOf("Step 1"));
     expect(guide).toContain("pmx doctor --json");
-    expect(await readFile(join(root, "scripts/export-public.sh"), "utf8")).toMatch(/PUBLIC=\(.*INSTALL\.md/);
+    // The export script stays in the private repo, so the public repo's tests skip this part.
+    const exporter = await readFile(join(root, "scripts/export-public.sh"), "utf8").catch(() => null);
+    if (exporter !== null) expect(exporter).toMatch(/PUBLIC=\(.*INSTALL\.md/);
     expect(await readFile(join(root, ".github/workflows/release.yml"), "utf8")).toContain("SHA256SUMS");
   });
 });
