@@ -26,4 +26,6 @@ jobs:
       - name: publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" productgit-*.tgz SHA256SUMS --title "pmx ${GITHUB_REF_NAME#v}" --notes "Install: follow INSTALL.md (https://github.com/${{ github.repository }}/blob/main/INSTALL.md). Changes: CHANGELOG.md."
+        run: |
+          gh release create "$GITHUB_REF_NAME" productgit-*.tgz SHA256SUMS --title "pmx ${GITHUB_REF_NAME#v}" \
+            --notes "Install: follow INSTALL.md (https://github.com/${{ github.repository }}/blob/main/INSTALL.md). Changes: CHANGELOG.md."
