@@ -56,8 +56,14 @@ export function ttyAsker(nonInteractive = !process.stdin.isTTY): Asker {
     },
     async choose(q, options, def) {
       if (nonInteractive) return def;
-      const a = await ask(`${q} (${options.join("/")}) [${def}]: `);
-      return (options.find((o) => o === a) ?? def) as any;
+      // A typo re-asks instead of silently taking the default.
+      for (;;) {
+        const a = await ask(`${q} (${options.join("/")}) [${def}]: `);
+        if (!a) return def;
+        const hit = options.find((o) => o === a.toLowerCase());
+        if (hit) return hit;
+        console.warn(`Pick one of ${options.join(", ")}.`);
+      }
     },
   };
 }

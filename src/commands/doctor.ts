@@ -1,4 +1,5 @@
 import { neededTasks, taskState } from "../claude/tasks.js";
+import { nodeSupported, resolveClaude } from "../core/claude-bin.js";
 import { missingAllowRules } from "../claude/permissions.js";
 import { linearAccess } from "../linear/access.js";
 import { relayHealth } from "../tracker/relay.js";
@@ -29,6 +30,8 @@ export interface DoctorDeps {
   keychain: Keychain;
   launchd: Launchd;
   exec: Exec;
+  /** The Node binary the background job uses; tests pass their own. */
+  execPath?: string;
   /** Extra checks from ee/ (license, policy). */
   extra?: () => Promise<DoctorCheck[]>;
 }
@@ -46,9 +49,13 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const add = (id: string, ok: boolean, detail: string, level: "fail" | "warn" = "fail") => out.push({ id, ok, detail, level });
 
   add("os.macos", process.platform === "darwin", "macOS (v1 supports macOS only, SCOPE-3)");
-  add("node", Number(process.versions.node.split(".")[0]) >= 20, `Node ${process.versions.node} (need 20+)`);
-  const cc = await d.exec("claude", ["--version"], { timeoutMs: 15000 });
-  add("claude.installed", cc.code === 0, cc.code === 0 ? `Claude Code ${cc.stdout.trim()}` : "Claude Code installed (https://code.claude.com)");
+  add("node", nodeSupported(), `Node ${process.versions.node}${nodeSupported() ? "" : ": PMX needs 22.12 or later (24 recommended): brew install node"}`);
+  // The background job keeps this Node's path, so a version manager switching or removing it stops the job.
+  const execPath = d.execPath ?? process.execPath;
+  if (/\/\.(nvm|fnm|volta|asdf)\/|\/n\/versions\//.test(execPath))
+    add("node.path", false, `Node runs from a version manager (${execPath}); the background job breaks if that version is switched or removed. Recommended: brew install node, reinstall pmx, then \`pmx init\``, "warn");
+  const cc = await resolveClaude(d.exec);
+  add("claude.installed", !!cc, cc ? `Claude Code ${cc.version}${cc.onPath ? "" : ` at ${cc.cmd} (not on your shell's PATH; PMX finds it there)`}` : "Claude Code installed (https://code.claude.com)");
 
   add("config.personal", !!d.personal, d.personal ? `personal config at ${paths.config()}` : "personal config missing: run `pmx init`");
   add("config.team", !!d.team, d.team ? `${TEAM_CONFIG_FILE} valid (team ${d.team.team})` : `team config: ${d.teamError ?? "missing"}`);
@@ -180,6 +187,13 @@ export function calibrate(entries: RunLogEntry[], team: TeamConfig, minRuns = 5)
       out.push({ size, text: `size ${size}: ${runs.length} runs took a median ${minutes.toFixed(0)} min and $${cost.toFixed(2)}; pmx.config.json says ${est.minutes} min and $${est.costUsd.toFixed(2)}. Suggest "${size}": { "minutes": ${Math.ceil(minutes)}, "costUsd": ${cost.toFixed(2)} }` });
   }
   return out;
+}
+
+/** `pmx doctor --json`: what an install script (or Claude, following INSTALL.md) checks. */
+export function doctorJson(checks: DoctorCheck[]) {
+  const failed = checks.filter((c) => !c.ok && c.level === "fail").map((c) => c.id);
+  const warnings = checks.filter((c) => !c.ok && c.level === "warn").map((c) => c.id);
+  return { ok: !failed.length, version: currentVersion(), node: process.versions.node, failed, warnings, checks };
 }
 
 export function formatDoctor(checks: DoctorCheck[]): { text: string; ok: boolean } {

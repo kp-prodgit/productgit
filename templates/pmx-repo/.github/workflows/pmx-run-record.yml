@@ -16,7 +16,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       # The CLI comes from the base branch, never from the PR: a package is a binary diff no one can
       # review, so a PR must not be able to swap in a CLI that passes its own check.
       - name: Install the PMX CLI from the base branch
@@ -25,6 +25,6 @@ jobs:
             git show "origin/$BASE:.pmx/cli/productgit.tgz" > "$RUNNER_TEMP/productgit.tgz"
             npm install -g "$RUNNER_TEMP/productgit.tgz"
           else
-            npm install -g productgit@{{PMX_VERSION}}
+            npm install -g "https://github.com/kp-prodgit/productgit/releases/download/v{{PMX_VERSION}}/productgit-{{PMX_VERSION}}.tgz"
           fi
       - run: pmx verify-record --base "origin/$BASE"

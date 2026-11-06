@@ -25,8 +25,8 @@ const V05 = new URL("./compat/v0.5.0/", import.meta.url).pathname;
 const old = (f: string) => join(OLD, f);
 
 describe("versions (COMPAT-1)", () => {
-  it("this release is 0.9.1 and versions compare by number", () => {
-    expect(currentVersion()).toBe("0.9.1");
+  it("this release is 0.10.0 and versions compare by number", () => {
+    expect(currentVersion()).toBe("0.10.0");
     expect(compareVersions("0.10.0", "0.9.0")).toBe(1);
     expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
     expect(compareVersions("dev", "1.0.0")).toBeNull();
@@ -174,7 +174,7 @@ describe("team minimum version (COMPAT-2)", () => {
   it("stops shared team work on an older machine but keeps personal work going", async () => {
     const { repo } = await pmxRepo();
     const ctx = await testCtx({ repo, team: { cli: { min: "9.0.0" } } });
-    await expect(services(ctx)).rejects.toThrow(/runs pmx 0\.9\.1, and your team needs 9\.0\.0.*pmx update/);
+    await expect(services(ctx)).rejects.toThrow(/runs pmx \d+\.\d+\.\d+, and your team needs 9\.0\.0.*pmx update/);
     await expect(refreshTodos(ctx)).resolves.toMatchObject({ added: [] });
 
     const ok = await testCtx({ repo, team: { cli: { min: "0.5.0" } } });
@@ -197,17 +197,17 @@ describe("version handshake with the hosted app (COMPAT-5)", () => {
     let status = 200;
     const f = (async (_url: string, init: any) => {
       seen.push(init.headers);
-      const body = status === 426 ? { error: "cli_too_old", message: "old", min: "0.10.0", latest: "1.0.0" } : { ok: true };
+      const body = status === 426 ? { error: "cli_too_old", message: "old", min: "99.0.0", latest: "99.0.0" } : { ok: true };
       return new Response(JSON.stringify(body), { status, headers: { "x-pmx-latest-version": "0.7.0", "x-pmx-min-version": "0.4.0" } });
     }) as any;
     const cloud = new Cloud("https://api.test/v1", memoryKeychain({ "machine-token": "pmxm_x" }), f);
     await cloud.call("GET", "/me");
-    expect(seen[0]!["x-pmx-version"]).toBe("0.9.1");
+    expect(seen[0]!["x-pmx-version"]).toBe("0.10.0");
     expect((await loadState()).cloudVersions).toMatchObject({ latest: "0.7.0", min: "0.4.0" });
 
     status = 426;
     const err = await cloud.call("GET", "/me").catch((e) => e);
     expect(err).toBeInstanceOf(CloudError);
-    expect(err.message).toMatch(/needs pmx 0\.10\.0 or newer; this is 0\.9\.1.*pmx update/);
+    expect(err.message).toMatch(/needs pmx 99\.0\.0 or newer; this is 0\.10\.0.*pmx update/);
   });
 });

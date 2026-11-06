@@ -1,4 +1,5 @@
 import type { TeamConfig } from "../core/config.js";
+import { resolveClaude } from "../core/claude-bin.js";
 import { exec as defaultExec, type Exec } from "../core/exec.js";
 import { cleanInvocation, profileChecks, type InvocationOpts } from "../core/profile.js";
 import type { AgentRuntime, ProbeResult, RunResult } from "./types.js";
@@ -9,14 +10,15 @@ export function claudeCode(exec: Exec = defaultExec): AgentRuntime {
 
     async probe(team: TeamConfig): Promise<ProbeResult> {
       const problems: string[] = [];
-      const v = await exec("claude", ["--version"], { timeoutMs: 15000 });
-      if (v.code !== 0) problems.push("Claude Code is not installed or not on PATH (https://code.claude.com).");
+      const v = await resolveClaude(exec);
+      if (!v) problems.push("Claude Code is not installed (https://code.claude.com).");
       for (const c of await profileChecks(team)) if (!c.ok) problems.push(`clean profile: ${c.detail}`);
-      return { ok: problems.length === 0, version: v.code === 0 ? v.stdout.trim() : null, problems };
+      return { ok: problems.length === 0, version: v?.version ?? null, problems };
     },
 
     async run(o: InvocationOpts): Promise<RunResult> {
       const inv = cleanInvocation(o);
+      inv.cmd = (await resolveClaude(exec))?.cmd ?? inv.cmd;
       const started = Date.now();
       const r = await exec(inv.cmd, inv.args, { cwd: inv.cwd, env: inv.env, timeoutMs: 3 * 60 * 60 * 1000, input: "" });
       const durationMs = Date.now() - started;

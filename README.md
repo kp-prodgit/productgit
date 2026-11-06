@@ -6,20 +6,24 @@ This repo is the product: the `pmx` CLI and engine, the skills and the PMX repo 
 
 ## Install (macOS)
 
-Until the package is on npm, install from a packaged build:
+The easy way: open Claude Code and say *"Install PMX following https://github.com/kp-prodgit/productgit/blob/main/INSTALL.md"*. Claude checks your Mac, installs the release package, walks you through `pmx init` and checks the result. Switch auto mode off first; the guide asks you to.
+
+By hand, with Node 22.12 or later (24 recommended: `brew install node`):
 
 ```bash
-npm pack                                # in this repo: builds and writes productgit-<version>.tgz
-npm install -g ./productgit-*.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/productgit-0.10.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/SHA256SUMS
+shasum -a 256 -c SHA256SUMS
+npm install -g ./productgit-0.10.0.tgz
 pmx init
 ```
 
-`pmx init` puts the same package in a new team's PMX repo at `.pmx/cli/productgit.tgz`, so teammates install it from their checkout (`npm install -g ./.pmx/cli/productgit.tgz`) without access to this repo, and the run-record CI check uses the same build. After upgrading, run `pmx vendor` and commit the new package in a PR of its own.
+The release package is prebuilt and has no dependencies, so installing it downloads and builds nothing. Joining a team that already uses PMX? Clone its PMX repo and install the team's copy instead: `npm install -g <repo>/.pmx/cli/productgit.tgz`. Use Homebrew's Node rather than nvm: the background job remembers Node's path, and nvm switching or removing a version breaks it.
 
-`pmx init` detects Claude Code, sets up or joins your team's PMX repo, stores tokens in the keychain, writes a clean run profile and registers one background job. Then:
+`pmx init` explains the PMX repo, checks every answer (and asks again if one is wrong), shows a summary, and saves nothing until you confirm. Then it sets up or joins your team's PMX repo, stores tokens in the keychain, writes a clean run profile and registers one background job. Then:
 
 ```bash
-pmx doctor        # green/red checklist, including every clean-profile check
+pmx doctor        # green/red checklist, including every clean-profile check (--json for scripts)
 pmx digest        # this week's digest from your transcripts, approved before it's committed
 ```
 
@@ -30,7 +34,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | Command | What it does |
 |---|---|
 | `init` | Set up this Mac: PMX repo, clean profile, skills, keychain, background job |
-| `doctor` | Checklist; fails if any clean-profile check is missing |
+| `doctor` | Checklist; fails if any clean-profile check is missing; `--json` for install scripts and Claude |
 | `digest` | Weekly digest from allowlisted sources, every claim cited, approved before commit |
 | `status` | Config, kill switch, spend and recent runs |
 | `explain` | How a run decided: what was found, used, left out, cut and masked, which skills and model ran, why each task got its size, and the cost. `--web` opens a local page |
@@ -46,7 +50,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `claim` / `release` | Claim a specific task; give one back; `--stale` releases expired claims |
 | `verify-record` | CI check: every output PR carries a clean run record |
 | `vendor` | Put this CLI's package in the PMX repo, so teammates and CI install the same version; `--require` makes it the team minimum, `--auto-update` installs it on every machine by itself |
-| `update` | Install your team's version from the PMX repo; `--check` only compares |
+| `update` | Install your team's version from the PMX repo; `--check` only compares; `--latest` installs the newest public release (for the team lead) |
 | `neutrality` | Run skill fixtures in a clean profile; `--compare` two machines' reports |
 | `review` | Accept, reject or redo-with-note in the terminal, or `--web` for a local review page; `--stats` for accept rates |
 | `login` | Sign in to the free hosted app; creates your team's free org if there isn't one |
@@ -82,8 +86,8 @@ Share it from the artifact's Share menu, then add `"board": { "url": "<link>" }`
 
 Your team's PMX repo holds the CLI package everyone installs (`.pmx/cli/productgit.tgz`), so a team moves to a new version together.
 
-- **The team lead:** after installing a new release, run `pmx vendor --require` and merge that PR. It stores the new package and makes it the team's minimum version.
-- **Automatically:** add `--auto-update` (`pmx vendor --require --auto-update`) and every machine's background job installs the team's version within the hour, with no Claude usage and even when the Claude app is closed. It never downgrades. Where npm's global folder needs `sudo` (Node installed as root), PMX can't type the password, so it tells the PM once to run `pmx update`; installing Node with Homebrew or nvm avoids that.
+- **The team lead:** run `pmx update --latest` (it installs the newest release after checking its SHA256SUMS), then `pmx vendor --require` and merge that PR. It stores the new package and makes it the team's minimum version.
+- **Automatically:** add `--auto-update` (`pmx vendor --require --auto-update`) and every machine's background job installs the team's version within the hour, with no Claude usage and even when the Claude app is closed. It never downgrades. Where npm's global folder needs `sudo` (Node installed as root), PMX can't type the password, so it tells the PM once to run `pmx update`; installing Node with Homebrew avoids that.
 - **Everyone else, or by hand:** run `pmx update`. It pulls the PMX repo and installs the team's version. `pmx doctor` says when you're behind.
 - **If you don't update:** your digest, to-dos and `pmx explain` keep working, but shared team work (suggesting tasks, pulling, the brain, the company roll-up) stops with a message until you do. That way an old version never writes something the rest of the team's versions would misread.
 - **What never breaks within a major version:** shared files and Linear labels only gain things; a file written by a newer pmx is refused, not misread; every release is tested against files older releases wrote; and the hosted API only adds to `/v1`. Details in [docs/control-plane-api.md](docs/control-plane-api.md) ("Versions").
@@ -113,11 +117,16 @@ The brain runs on one of your team's machines on your own Claude plan, so task t
 
 ## Develop
 
+Node 24 (`.nvmrc`); CI also checks the oldest supported Node, 22.12.
+
 ```bash
-npm install
+git clone https://github.com/kp-prodgit/productgit.git && cd productgit
+npm ci            # npm ci, not npm install, so package-lock.json never changes under you
 npm test
 npm run build && node dist/src/cli.js --help
 ```
+
+Releases: bump the version in `package.json`, `.claude-plugin/plugin.json` and `INSTALL.md`, then push a `v<version>` tag. The release workflow tests, packs and publishes the package with its SHA256SUMS.
 
 ## Contributing
 

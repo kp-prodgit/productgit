@@ -29,13 +29,13 @@ describe("pmx init and doctor (CLI-2, CLI-3)", () => {
       keychain, launchd, exec: withClaude, out, now: () => new Date("2026-11-03T00:00:00Z"), cliPath: "/x/cli.js",
     });
     expect(p.repoPath).toBe(repo);
-    // Teammates and CI install the CLI from the repo; the workflow's npm fallback is pinned.
+    // Teammates and CI install the CLI from the repo; the workflow's fallback is the pinned release package.
     const listing = await exec("tar", ["-tzf", join(repo, VENDORED_CLI)]);
     expect(listing.stdout).toContain("package/package.json");
     expect(listing.stdout).toContain("package/skills/pmx-spec/SKILL.md");
     const workflow = await readFile(join(repo, ".github/workflows/pmx-run-record.yml"), "utf8");
     expect(workflow).not.toContain("{{PMX_VERSION}}");
-    expect(workflow).toMatch(/npm install -g productgit@\d+\.\d+\.\d+/);
+    expect(workflow).toMatch(/npm install -g "https:\/\/github\.com\/kp-prodgit\/productgit\/releases\/download\/v(\d+\.\d+\.\d+)\/productgit-\1\.tgz"/);
     expect(workflow).toContain('git show "origin/$BASE:.pmx/cli/productgit.tgz"');
     expect(launchd.plist).toContain("<string>tick</string>");
     expect(launchd.plist).toContain("<integer>1800</integer>");

@@ -8,14 +8,14 @@ import { effectiveTeam } from "../core/services.js";
 import { macKeychain } from "../core/keychain.js";
 import { capTickLogs, macLaunchd } from "../core/launchd.js";
 import { runDigest } from "./digest.js";
-import { formatDoctor, runDoctor } from "./doctor.js";
+import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { nextSteps, runInit, type InviteFile } from "./init.js";
 import { runStatus } from "./status.js";
 import { digestStep, runTick, type TickStep } from "./tick.js";
 import { runUninstall } from "./uninstall.js";
 import { VENDORED_CLI, vendorCli } from "../core/vendor.js";
 import { atLeast, currentVersion, vendoredVersion } from "../core/version.js";
-import { installTeamVersion, type UpdateOutcome } from "../core/update.js";
+import { installLatestRelease, installTeamVersion, type UpdateOutcome } from "../core/update.js";
 import { Git } from "../core/git.js";
 import { loadState } from "../core/state.js";
 import { writeJson } from "../core/fsutil.js";
@@ -87,9 +87,16 @@ export const commands: Command[] = [
   {
     name: "doctor",
     summary: "Green/red checklist, including every clean-profile check",
-    options: {},
-    async run() {
-      const r = formatDoctor(await doctorChecks());
+    usage: "pmx doctor [--json]",
+    options: { json: { type: "boolean" } },
+    async run(a) {
+      const checks = await doctorChecks();
+      if (a.values.json) {
+        const j = doctorJson(checks);
+        console.log(JSON.stringify(j, null, 2));
+        return j.ok ? 0 : 1;
+      }
+      const r = formatDoctor(checks);
       console.log(r.text);
       return r.ok ? 0 : 1;
     },
@@ -190,10 +197,22 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
   },
   {
     name: "update",
-    summary: "Install your team's pmx version from the PMX repo (pulls the repo first); --check only compares versions",
-    usage: "pmx update [--check] [--force]",
-    options: { check: { type: "boolean" }, force: { type: "boolean" } },
+    summary: "Install your team's pmx version from the PMX repo (pulls the repo first); --check only compares versions; --latest installs the newest public release",
+    usage: "pmx update [--check] [--force] [--latest]",
+    options: { check: { type: "boolean" }, force: { type: "boolean" }, latest: { type: "boolean" } },
     async run(a) {
+      if (a.values.latest) {
+        const r = await installLatestRelease(exec, { force: a.values.force });
+        console.log({
+          current: `pmx ${currentVersion()} is the latest release.`,
+          updated: `Installed pmx ${"version" in r ? r.version : ""}. Team lead: run \`pmx vendor --require\` and merge it, so your team gets it too.`,
+          "dev-install": "This pmx runs from a source checkout, so it isn't replaced. Pull and rebuild the checkout instead.",
+          "needs-sudo": `npm can't write to its global folder. Install Node with Homebrew (brew install node), or run:\n  ${r.result === "needs-sudo" ? r.command : ""}`,
+          failed: `Update failed: ${r.result === "failed" ? r.error : ""}`,
+          "no-package": "",
+        }[r.result]);
+        return r.result === "current" || r.result === "updated" ? 0 : 1;
+      }
       const personal = await loadPersonalConfig();
       const repo = personal.repoPath;
       const git = new Git(repo, exec);
@@ -220,7 +239,7 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
         current: "\nUp to date.",
         updated: `\nUpdated to pmx ${vendored}. The background job uses it from its next pass.`,
         "dev-install": "\nThis pmx runs from a source checkout, so it isn't replaced. Pull and rebuild the checkout instead.",
-        "needs-sudo": `\nnpm can't write to its global folder. Run:\n  ${r.result === "needs-sudo" ? r.command : ""}\nor install Node with Homebrew or nvm, so updates (and auto-updates) don't need sudo.`,
+        "needs-sudo": `\nnpm can't write to its global folder. Run:\n  ${r.result === "needs-sudo" ? r.command : ""}\nor install Node with Homebrew (brew install node), so updates (and auto-updates) don't need sudo.`,
         failed: `\nnpm install failed: ${r.result === "failed" ? r.error : ""}`,
       };
       console.log(say[r.result]);

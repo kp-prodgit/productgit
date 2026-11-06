@@ -2,6 +2,21 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.10.0: a solo install that works
+
+Fixes from a first-time install, so one PM can install PMX on a fresh Mac without help.
+
+- **A prebuilt release package (INSTALL-1).** Each version tag publishes `productgit-<version>.tgz` and `SHA256SUMS` as a GitHub release on the public repo. The package has no dependencies, so installing it builds and downloads nothing: no `tsc: command not found`, no Node range warnings, no audit warnings.
+- **`INSTALL.md`, written for Claude Code (INSTALL-2).** Say "Install PMX following …/INSTALL.md" and Claude asks you to switch auto mode off, checks the Mac, installs the package after checking its checksum, walks you through `pmx init`, reads `pmx doctor --json` and sets up the scheduled tasks.
+- **`pmx init` checks every answer (INIT-1).** It explains what the PMX repo is. A command pasted into the wrong prompt, an invalid folder, URL, handle, category, time or amount is asked again, up to three times. A new working-days question accepts `Mon-Fri` or `Mon,Wed,Fri`. Working hours must be `HH:MM-HH:MM`, and the spend question says that 0 pauses the agent. A summary of every answer comes before anything is saved, and saying no saves nothing.
+- **Security fix:** `pmx init` passes a git URL to `git clone` after `--`, so an answer like `--upload-pack=…` can't run a command.
+- **`pmx doctor --json`** lists failed checks and warnings by id, for install scripts and Claude.
+- **Doctor and runs find Claude Code in `~/.local/bin`** (and other installer folders) when it isn't on your shell's PATH.
+- **Node 22.12 or later, or 24 or later** (`engines`, doctor, README). Node 24 from Homebrew is recommended. Doctor warns when Node runs from nvm or another version manager, because the background job breaks when that version is switched or removed.
+- **`pmx update --latest`** installs the newest public release after checking its SHA256SUMS, so a team lead can update without building from source, then share it with `pmx vendor --require`.
+- New PMX repos' run-record workflow falls back to the release package instead of npm, where PMX isn't published.
+- Contributors: vitest 5 (no audit findings), `.nvmrc`, `npm ci`, and CI checks the oldest supported Node.
+
 ## 0.9.1: no false alarms, and scheduled runs that don't stall
 
 Fixes from a first-time install.

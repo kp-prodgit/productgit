@@ -24,7 +24,7 @@ export async function scaffoldRepo(repoPath: string, team: Partial<TeamConfig> &
       if (e.isDirectory()) await copyTree(src, dst, join(rel, e.name));
       else if (!(await present(dst))) {
         await cp(src, dst, { recursive: false });
-        // Workflows pin the npm fallback to this CLI's version.
+        // Workflows pin the release-package fallback to this CLI's version.
         if (e.name.endsWith(".yml")) await writeFile(dst, (await readFile(dst, "utf8")).replaceAll("{{PMX_VERSION}}", await cliVersion()));
         created.push(join(rel, e.name));
       }
