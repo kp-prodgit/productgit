@@ -2,6 +2,19 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.9.1: no false alarms, and scheduled runs that don't stall
+
+Fixes from a first-time install.
+
+- **`pmx doctor` checks Linear the way this Mac reaches it.** Going through Claude (the default) no longer fails "Linear token in the keychain". Doctor instead warns when the Claude sync is stale, is for the wrong project, or has changes failing. A Claude Pro or Max plan no longer warns either: PMX runs on your Claude subscription.
+- **Doctor warns when the team package is older than this Mac.** Teammates who install or update would get the older version, so it tells the team lead to run `pmx vendor --require`.
+- **Linear sign-in is hidden (LINEAR-1 deferred).** Product Git's Linear app isn't registered, so `pmx linear login` couldn't work. PMX reaches Linear through your Claude app by default. `pmx init` no longer asks for a Linear key, and `pmx linear key` stores one for advanced use (the company roll-up needs one). Anyone already signed in keeps working, and `pmx uninstall` now removes that sign-in too.
+- **Scheduled runs don't stall (CLAUDE-3).** A run waiting on a permission prompt nobody answers blocked every later run. With your OK, `pmx init` and `pmx schedule --allow` add always-allow rules for PMX's own command and folder to your Claude settings. Doctor warns while they're missing.
+- **`/pmx-schedule` updates tasks with an older prompt**, not just missing ones. It stops when run by a schedule, and asks you to turn auto mode off first. Task prompts now say never to create or change scheduled tasks. `pmx schedule` says the tasks run on this Mac only, in local time, while the Claude app is open, and where to see their runs.
+- **`pmx init` ends with one "Next step" block**, printed after the doctor checklist.
+- **The background job's logs are capped (OBS-1)** at 1 MB each, keeping one previous file.
+- The lockfile matches `package.json` again, and CI checks that it stays that way, so `npm install` no longer blocks the next `git pull`.
+
 ## 0.9.0: the team board inside Claude
 
 - **`/pmx-board` (BOARD-1).** The team board as a live Claude artifact: pool → ready → in flight → review → done, read from your Linear project through each viewer's own Linear connector, so it needs no hosted app, API key or sign-in. It moves cards between the pool and Ready (with category and size) when someone clicks; agents, runs and reviews stay in PMX. Offered only when PMX is used with Claude: `pmx init` adds `/pmx-board` beside `/pmx-schedule` when Claude is set up and the team uses Linear (or run `pmx board --install-skill`). Type it in the Claude app and Claude publishes the page PMX prepared, with exactly the Linear tools it needs.

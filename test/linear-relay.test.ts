@@ -73,7 +73,7 @@ describe("pmx linear login (LINEAR-1)", () => {
 
   it("explains what to do before Product Git's Linear app exists", async () => {
     delete process.env.PMX_LINEAR_CLIENT_ID;
-    await expect(linearLogin({ keychain: memoryKeychain(), open: async () => {} })).rejects.toThrow(/isn't registered yet.*pmx linear relay/);
+    await expect(linearLogin({ keychain: memoryKeychain(), open: async () => {} })).rejects.toThrow(/isn't available.*through your Claude app.*pmx linear key/);
   });
 });
 
@@ -177,13 +177,17 @@ describe("Claude tasks PMX needs (CLAUDE-1)", () => {
 
     let out = await formatTasks(team, memoryKeychain());
     expect(out).toContain("✘ PMX: collect meetings and update to-dos: missing");
-    expect(out).toContain('Create a scheduled task titled "PMX: sync Linear through Claude" with task ID pmx-sync-linear');
+    expect(out).toContain('Create (or, if it exists, update) a scheduled task titled "PMX: sync Linear through Claude" with task ID pmx-sync-linear');
     expect(out).toContain("pmx linear relay --prompt");
 
     for (const t of [COLLECT_TASK, LINEAR_SYNC_TASK]) {
       await mkdir(join(taskFile(t.id), ".."), { recursive: true });
       await writeFile(taskFile(t.id), "---\nname: x\n---\n");
     }
+    out = await formatTasks(team, memoryKeychain());
+    expect(out).toContain("! PMX: collect meetings and update to-dos: set up with an older prompt");
+    expect(out).toContain("on this Mac only");
+    for (const t of [COLLECT_TASK, LINEAR_SYNC_TASK]) await writeFile(taskFile(t.id), `---\nname: x\n---\n\n${t.prompt}`);
     out = await formatTasks(team, memoryKeychain());
     expect(out).toMatch(/Every Claude task this machine needs is set up/);
     expect(await readFile(taskFile(COLLECT_TASK.id), "utf8")).toContain("name: x");

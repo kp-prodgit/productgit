@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # A stale lockfile makes `npm install` rewrite it, which then blocks `git pull` on source checkouts.
+      - name: lockfile matches package.json
+        run: npm install --package-lock-only --ignore-scripts && git diff --exit-code package-lock.json
       - run: npm ci
       - run: npm pack
       - run: npm install -g ./productgit-*.tgz

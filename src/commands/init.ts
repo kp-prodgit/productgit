@@ -1,5 +1,7 @@
 import { boardUrl, checkBoard, renderBoard } from "../claude/board.js";
-import { appSkillInstalled, appSkillTarget, BOARD_SKILL, installAppSkill } from "../claude/skill.js";
+import { addAllowRules, ALLOW_RULES, missingAllowRules } from "../claude/permissions.js";
+import { appSkillInstalled, appSkillTarget, BOARD_SKILL, claudePresent, installAppSkill } from "../claude/skill.js";
+import { linearAccess } from "../linear/access.js";
 import { createHash } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { hostname, homedir } from "node:os";
@@ -133,7 +135,6 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   // 4. Secrets go to the keychain only (SEC-10).
   const secrets: [Parameters<Keychain["set"]>[0], string, boolean][] = [
     ["slack-token", "Slack bot token, read-only scopes plus chat:write for DMs (blank to skip)", !!slackChannel || team.synthesizer === handle],
-    ["linear-token", "Linear API key with access to the PMX project (blank to skip: sign in later with `pmx linear login`, or let Claude talk to Linear for you)", team.tracker.kind === "linear" && !d.invite],
     ["github-token", "GitHub token for opening PRs in the PMX repo (blank to use `gh`)", !!(await git.remoteUrl())?.includes("github.com")],
   ];
   for (const [name, q, needed] of secrets) {
@@ -182,13 +183,26 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
     }
     if (board.ok) await renderBoard(team).catch(() => null);
   }
+  // CLAUDE-3: scheduled runs stall on prompts nobody answers, so offer always-allow rules for PMX's own command and folder.
+  if ((await claudePresent()) && (await missingAllowRules()).length
+    && (await ask.confirm(`Let PMX's scheduled tasks run pmx and use ~/.pmx without asking each time? (adds ${ALLOW_RULES.join(", ")} to your Claude settings)`, true))) {
+    const r = await addAllowRules();
+    if (r.error) out.warn(r.error);
+  }
+  if ((await linearAccess(team, d.keychain)) === "relay") out.info("Linear: PMX reaches it through your Claude app's Linear connector. No key or sign-in needed.");
   out.info("\nSetup done. The first week runs pulls as dry runs, so you can see what your agent would do.");
-  out.info(`Next: put call transcripts in ${transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
-  out.info((await appSkillInstalled())
-    ? "Then, in the Claude desktop app, type /pmx-schedule: Claude creates PMX's scheduled tasks (meeting collection, and the Linear sync if you didn't sign in)."
-    : "Then set up PMX's tasks in your Claude app: run `pmx schedule` and paste what it prints into the Claude app.");
-  const shared = boardUrl(team, personal);
-  if (shared) out.info(`Your team's board: ${shared.url}`);
-  else if (board.ok && (await appSkillInstalled(BOARD_SKILL))) out.info("For the team board, type /pmx-board in the Claude app: Claude publishes it as a live artifact that reads Linear through your Linear connector.");
   return personal;
+}
+
+/** The one "Next step" block, printed after doctor so it's the last thing the PM reads. */
+export async function nextSteps(team: TeamConfig, personal: PersonalConfig): Promise<string> {
+  const lines = ["Next step:"];
+  lines.push((await appSkillInstalled())
+    ? "  1. Open the Claude desktop app (Code tab), start a session with auto mode off, and type /pmx-schedule. Claude creates PMX's scheduled tasks; click \"Run now\" on each once."
+    : "  1. Run `pmx schedule` and paste what it prints into the Claude desktop app (Code tab), in a session with auto mode off.");
+  lines.push(`  2. Put call transcripts in ${personal.sources.transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
+  const shared = boardUrl(team, personal);
+  if (shared) lines.push(`Your team's board: ${shared.url}`);
+  else if ((await checkBoard(team)).ok && (await appSkillInstalled(BOARD_SKILL))) lines.push("For the team board, type /pmx-board in the Claude app: Claude publishes it as a live artifact that reads Linear through your Linear connector.");
+  return lines.join("\n");
 }

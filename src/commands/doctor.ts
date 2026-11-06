@@ -1,6 +1,9 @@
-import { neededTasks, taskExists } from "../claude/tasks.js";
+import { neededTasks, taskState } from "../claude/tasks.js";
+import { missingAllowRules } from "../claude/permissions.js";
+import { linearAccess } from "../linear/access.js";
+import { relayHealth } from "../tracker/relay.js";
 import { boardUrl, checkBoard } from "../claude/board.js";
-import { appSkillInstalled, BOARD_SKILL } from "../claude/skill.js";
+import { appSkillInstalled, BOARD_SKILL, claudePresent } from "../claude/skill.js";
 import { loadState } from "../core/state.js";
 import { VENDORED_CLI } from "../core/vendor.js";
 import { atLeast, compareVersions, currentVersion, vendoredVersion } from "../core/version.js";
@@ -37,7 +40,6 @@ export interface DoctorCheck extends Check {
 /** Token shapes that must never appear in a plain-text config (SEC-10). */
 const TOKEN_SHAPES = /\b(xox[abpr]-[\w-]{10,}|lin_(api|oauth)_\w{20,}|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-ant-[\w-]{20,}|pmxm_\w{20,})/;
 
-const CONSUMER_PLANS = new Set(["pro", "max", "free"]);
 
 export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const out: DoctorCheck[] = [];
@@ -70,13 +72,26 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const current = currentVersion();
   const min = d.team.cli?.min;
   add("cli.team-minimum", !min || atLeast(current, min), min ? `pmx ${current}; team minimum ${min}${atLeast(current, min) ? "" : ": run `pmx update`"}` : `pmx ${current}; no team minimum set (\`pmx vendor --require\` sets one)`);
+  // The team package is what teammates and the background job install, so one older than this Mac warns too.
   const vendored = await vendoredVersion(join(repo, VENDORED_CLI), d.exec);
-  add("cli.team-package", !vendored || !((compareVersions(vendored, current) ?? 0) > 0),
-    vendored ? `team package is pmx ${vendored}${(compareVersions(vendored, current) ?? 0) > 0 ? ": run `pmx update`" : ""}` : `no CLI package in the PMX repo (\`pmx vendor\`)`, "warn");
+  const drift = vendored ? compareVersions(vendored, current) ?? 0 : 0;
+  add("cli.team-package", !vendored || drift === 0,
+    !vendored ? `no CLI package in the PMX repo (\`pmx vendor\`)`
+      : drift > 0 ? `team package is pmx ${vendored}, newer than this Mac's ${current}: run \`pmx update\``
+      : drift < 0 ? `team package is pmx ${vendored}, older than this Mac's ${current}: teammates who install or update get ${vendored}. Team lead: run \`pmx vendor --require\` and merge it`
+      : `team package is pmx ${vendored}`, "warn");
   // Claude tasks (CLAUDE-1): PMX can't create them, so doctor says which are missing.
   const fix = (await appSkillInstalled()) ? "type /pmx-schedule in the Claude app" : "run `pmx schedule`";
-  for (const t of await neededTasks(d.team, d.keychain))
-    add(`claude.task.${t.id}`, await taskExists(t.id), `Claude scheduled task "${t.title}"${(await taskExists(t.id)) ? "" : ` is missing: ${fix}`}`, "warn");
+  const tasks = await neededTasks(d.team, d.keychain);
+  for (const t of tasks) {
+    const state = await taskState(t);
+    add(`claude.task.${t.id}`, state === "current", `Claude scheduled task "${t.title}"${state === "current" ? "" : state === "outdated" ? ` has an older prompt: ${fix}` : ` is missing: ${fix}`}`, "warn");
+  }
+  // CLAUDE-3: without always-allow rules, a scheduled run waits on a prompt nobody answers and blocks later runs.
+  if (await claudePresent()) {
+    const rules = await missingAllowRules();
+    add("claude.allow", !rules.length, rules.length ? `scheduled tasks will stop to ask permission (${rules.join(", ")} not allowed): run \`pmx schedule --allow\`` : "scheduled tasks may run pmx and use ~/.pmx without asking", "warn");
+  }
   // The Claude board (BOARD-1), only where Claude and Linear are both in use.
   if ((await checkBoard(d.team)).ok) {
     const b = boardUrl(d.team, d.personal);
@@ -111,18 +126,18 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const have = new Set(await d.keychain.list());
   const slackNeeded = d.team.allowedSources.includes("slack") && (!!d.personal.sources.slackChannel || d.team.synthesizer !== null);
   if (slackNeeded) add("secrets.slack", have.has("slack-token"), "Slack token in the keychain");
-  if (d.team.tracker.kind === "linear" && !d.team.controlPlane)
-    add("secrets.linear", have.has("linear-token"), "Linear token in the keychain");
+  // Linear is checked the way this Mac reaches it (LINEAR-1, LINEAR-2): the relay needs no token, so it can't fail here.
+  const access = await linearAccess(d.team, d.keychain);
+  if (access === "key") add("secrets.linear", true, "Linear API key in the keychain");
+  if (access === "signed-in") add("secrets.linear", true, "signed in to Linear");
+  if (access === "relay") {
+    const h = await relayHealth(d.team);
+    add("linear.relay", h.ok, h.detail, "warn");
+  }
 
+  // PMX runs on the PM's Claude subscription; only Free has no Claude Code.
   const plan = d.personal.plan;
-  add(
-    "model.plan",
-    !CONSUMER_PLANS.has(plan),
-    CONSUMER_PLANS.has(plan)
-      ? `model plan is "${plan}": use Claude Code Team/Enterprise or an API key (Anthropic, Bedrock, Vertex) for automation (SEC-9)`
-      : `model plan "${plan}" (SEC-9)`,
-    "warn",
-  );
+  add("model.plan", plan !== "free", plan === "free" ? "Claude Free doesn't include Claude Code: PMX needs a Pro, Max, Team or Enterprise plan" : `model plan "${plan}"`, "warn");
 
   add("schedule.launchd", await d.launchd.isLoaded(), "one launchd job registered (runs `pmx tick` every 30 min)", "warn");
 

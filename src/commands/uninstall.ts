@@ -17,7 +17,7 @@ export async function runUninstall(d: { ask: Asker; keychain: Keychain; launchd:
     return;
   }
   await d.launchd.uninstall();
-  const names: SecretName[] = ["slack-token", "linear-token", "github-token", "machine-token", "anthropic-api-key"];
+  const names: SecretName[] = ["slack-token", "linear-token", "linear-oauth", "github-token", "machine-token", "anthropic-api-key"];
   for (const n of names) await d.keychain.delete(n);
   const cfg = await readJson<{ repoPath?: string }>(paths.config());
   await rm(pmxHome(), { recursive: true, force: true });

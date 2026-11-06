@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { exec as defaultExec, type Exec } from "./exec.js";
@@ -81,4 +81,18 @@ export function fakeLaunchd(): Launchd & { plist: string | null } {
     async isLoaded() { return f.plist !== null; },
   };
   return f;
+}
+
+/** The background job's own logs, which launchd appends to forever. */
+export const tickLogs = () => [join(paths.logs(), "tick.log"), join(paths.logs(), "tick.err.log")];
+
+/**
+ * Keeps each tick log under `maxBytes` (OBS-1): a full log moves to `<name>.1`, replacing the previous one,
+ * so each log takes at most twice `maxBytes`. launchd opens a fresh file on the next run. Never throws.
+ */
+export async function capTickLogs(maxBytes = 1024 * 1024): Promise<void> {
+  for (const f of tickLogs()) {
+    const s = await stat(f).catch(() => null);
+    if (s && s.size > maxBytes) await rename(f, `${f}.1`).catch(() => {});
+  }
 }

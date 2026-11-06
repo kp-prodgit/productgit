@@ -40,7 +40,11 @@ describe("/pmx-schedule skill (CLAUDE-2)", () => {
     expect(j.missing[0]!.prompt).toContain("pmx collect --prompt");
 
     await mkdir(join(taskFile(COLLECT_TASK.id), ".."), { recursive: true });
-    await writeFile(taskFile(COLLECT_TASK.id), "x");
+    await writeFile(taskFile(COLLECT_TASK.id), "---\nname: pmx-collect-meetings\n---\n\nan older prompt");
+    const old = await tasksJson(team, memoryKeychain());
+    expect(old.outdated.map((t) => t.taskId)).toEqual(["pmx-collect-meetings"]); // /pmx-schedule updates its prompt
+    expect(old.present).toEqual([]);
+    await writeFile(taskFile(COLLECT_TASK.id), `---\nname: pmx-collect-meetings\ndescription: x\n---\n\n${COLLECT_TASK.prompt}\n`);
     expect((await tasksJson(team, memoryKeychain())).present).toEqual(["pmx-collect-meetings"]);
   });
 
@@ -49,6 +53,6 @@ describe("/pmx-schedule skill (CLAUDE-2)", () => {
     await installAppSkill();
     const out = await formatTasks(team, memoryKeychain());
     expect(out).toMatch(/type \/pmx-schedule/);
-    expect(out).toContain('Create a scheduled task titled "PMX: sync Linear through Claude"'); // the paste fallback stays
+    expect(out).toContain('Create (or, if it exists, update) a scheduled task titled "PMX: sync Linear through Claude"'); // the paste fallback stays
   });
 });

@@ -111,7 +111,7 @@ export function relayTracker(team: TeamConfig, warn: (m: string) => void = () =>
 
   async function state() {
     const snap = await readSnapshot();
-    if (!snap) throw new Error("Claude hasn't synced Linear for PMX yet. Run the \"PMX: sync Linear\" task in your Claude app (or `pmx linear login`).");
+    if (!snap) throw new Error("Claude hasn't synced Linear for PMX yet. Run the \"PMX: sync Linear through Claude\" task in your Claude app (`pmx schedule` shows how to set it up).");
     if (snap.projectId !== projectId) throw new Error(`The Linear snapshot is for project ${snap.projectId}, not this team's ${projectId}. Run the sync task again.`);
     if (now().getTime() - Date.parse(snap.syncedAt) > STALE_MS) warn(`Linear was last synced by Claude at ${snap.syncedAt}; tasks may be out of date.`);
     const outbox = await readOutbox();
@@ -215,6 +215,22 @@ The connector may list labels by name only and shorten long descriptions. Look u
 
 ## 3. Finish
 Run \`pmx linear relay --check\` and report what it prints. Don't change anything else in Linear or in any other app.`;
+}
+
+/** For `pmx doctor`: how the relay is doing, read-only (unlike `checkRelay`, it never changes a file). */
+export async function relayHealth(team: TeamConfig, now = new Date()): Promise<{ ok: boolean; detail: string }> {
+  const snap = await readSnapshot();
+  const ops = (await readOutbox()).ops;
+  const failing = ops.filter((o) => (o.failures ?? 0) > 0).length;
+  const queue = `${ops.length} change(s) waiting${failing ? `, ${failing} failed at least once` : ""}`;
+  const how = "run the \"PMX: sync Linear through Claude\" task in the Claude app (`pmx schedule` says whether it exists)";
+  if (!snap) return { ok: false, detail: `Linear through Claude: not synced yet; ${how}` };
+  if (team.tracker.kind === "linear" && snap.projectId !== team.tracker.projectId)
+    return { ok: false, detail: `Linear through Claude: the snapshot is for project ${snap.projectId}, not this team's; ${how}` };
+  const age = now.getTime() - Date.parse(snap.syncedAt);
+  const hours = Math.round(age / 3600000);
+  if (!(age <= STALE_MS)) return { ok: false, detail: `Linear through Claude: last synced ${hours}h ago (${queue}); ${how}` };
+  return { ok: !failing, detail: `Linear through Claude: synced ${hours ? `${hours}h` : "under an hour"} ago, ${queue}` };
 }
 
 /** `pmx linear relay --check`: takes in Claude's results and snapshot, and checks both against PMX's rules. */

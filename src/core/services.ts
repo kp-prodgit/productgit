@@ -72,7 +72,7 @@ export async function projectTracker(ctx: Ctx, p: ProjectRef): Promise<Tracker> 
   const viaEe = await overrides.project?.(ctx, p);
   if (viaEe) return viaEe;
   const token = (await ctx.keychain.get("linear-token")) ?? (await linearAccessToken(ctx.keychain, ctx.fetch, ctx.now()));
-  if (!token) throw new Error("The company roll-up reads several Linear projects, which the Claude relay doesn't cover. Run `pmx linear login` on the company machine.");
+  if (!token) throw new Error("The company roll-up reads several Linear projects, which the Claude relay doesn't cover. Store a Linear API key on the company machine with `pmx linear key`.");
   return linearTracker({ token, teamKey: p.teamKey, projectId: p.projectId, fetch: ctx.fetch });
 }
 

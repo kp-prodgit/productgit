@@ -1,6 +1,6 @@
 {
   "name": "productgit",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Product Git: synthesize product signals into sized work and let each PM's agent draft it, paced by human review.",
   "license": "Apache-2.0",
   "type": "module",

@@ -92,7 +92,7 @@ export interface LinearLoginOpts {
 /** The browser flow: authorize on linear.app, the code comes back to localhost, the grant goes to the keychain. */
 export async function linearLogin(o: LinearLoginOpts): Promise<LinearGrant> {
   const clientId = o.clientId ?? linearClientId();
-  if (!clientId) throw new Error("Product Git's Linear app isn't registered yet, so `pmx linear login` can't start. Use a Linear API key for now (`pmx init`), set PMX_LINEAR_CLIENT_ID to your own Linear OAuth app, or let Claude handle Linear (`pmx linear relay`).");
+  if (!clientId) throw new Error("Linear sign-in isn't available. PMX reaches Linear through your Claude app by default (`pmx linear status`); for a direct connection, store an API key with `pmx linear key`.");
   const f = o.fetch ?? fetch;
   const port = o.port ?? LINEAR_REDIRECT_PORT;
   const redirect = `http://localhost:${port}/callback`;

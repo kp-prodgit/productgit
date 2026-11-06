@@ -64,7 +64,7 @@ describe("pmx init and doctor (CLI-2, CLI-3)", () => {
     await writeFile(paths.config(), JSON.stringify(cfg));
     const checks = await runDoctor({ personal: p, team: await loadTeamConfig(repo), keychain, launchd, exec: withClaude });
     expect(checks.find((c) => c.id === "secrets.not-in-config")!.ok).toBe(false);
-    expect(checks.find((c) => c.id === "model.plan")).toMatchObject({ ok: false, level: "warn" });
+    expect(checks.find((c) => c.id === "model.plan")).toMatchObject({ ok: true }); // runs on the PM's subscription
   });
 
   it("doctor fails every clean-profile check when the profile is missing", async () => {

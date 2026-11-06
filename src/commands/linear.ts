@@ -1,8 +1,10 @@
 import { formatTasks, tasksJson } from "../claude/tasks.js";
 import { boardJson, checkBoard, formatBoard, renderBoard, setBoardUrl, boardUrl } from "../claude/board.js";
 import { appSkillInstalled, appSkillTarget, BOARD_SKILL, installAppSkill } from "../claude/skill.js";
+import { addAllowRules, claudeSettingsFile } from "../claude/permissions.js";
 import { exec } from "../core/exec.js";
 import { macKeychain } from "../core/keychain.js";
+import { linearAccess } from "../linear/access.js";
 import { linearLogin, linearLogout, readGrant } from "../linear/oauth.js";
 import { checkRelay, readOutbox, readSnapshot, relayPrompt } from "../tracker/relay.js";
 import type { Command } from "./index.js";
@@ -12,23 +14,26 @@ async function openUrl(url: string) {
   console.log(`If your browser didn't open, go to:\n${url}`);
 }
 
-/** How this machine reaches Linear, in order: API key, Linear sign-in, hosted broker, Claude relay (LINEAR-1, LINEAR-2). */
+/** How this machine reaches Linear, in words (LINEAR-1, LINEAR-2). */
 export async function linearMode(ctx: import("../core/context.js").Ctx): Promise<string> {
-  if (ctx.team.tracker.kind !== "linear") return "no Linear project in pmx.config.json";
-  if (await ctx.keychain.get("linear-token")) return "Linear API key in the keychain";
-  const g = await readGrant(ctx.keychain);
-  if (g) return `signed in to Linear${g.user ? ` as ${g.user}` : ""} (renews itself; access valid to ${g.expiresAt.slice(0, 16).replace("T", " ")})`;
-  if (ctx.team.controlPlane) return "through the hosted app's Linear connection";
+  const access = await linearAccess(ctx.team, ctx.keychain);
+  if (access === "none") return "no Linear project in pmx.config.json";
+  if (access === "key") return "Linear API key in the keychain";
+  if (access === "signed-in") {
+    const g = await readGrant(ctx.keychain);
+    return `signed in to Linear${g?.user ? ` as ${g.user}` : ""}${g ? ` (renews itself; access valid to ${g.expiresAt.slice(0, 16).replace("T", " ")})` : ""}`;
+  }
+  if (access === "hosted") return "through the hosted app's Linear connection";
   const snap = await readSnapshot();
   const pending = (await readOutbox()).ops.length;
-  return `through Claude (no key or sign-in): ${snap ? `last synced ${snap.syncedAt}` : "not synced yet"}, ${pending} change(s) waiting for the next sync`;
+  return `through your Claude app: ${snap ? `last synced ${snap.syncedAt}` : "not synced yet"}, ${pending} change(s) waiting for the next sync`;
 }
 
 export const linearCommands: Command[] = [
   {
     name: "linear",
-    summary: "Connect PMX to Linear: login (browser sign-in, no API key), logout, status; without either, Claude relays through its Linear connector",
-    usage: "pmx linear login | pmx linear logout | pmx linear status | pmx linear relay --prompt | pmx linear relay --check",
+    summary: "How PMX reaches Linear: through your Claude app's Linear connector (no key or sign-in) by default",
+    usage: "pmx linear status | pmx linear relay --prompt | pmx linear relay --check | pmx linear key (advanced: store a Linear API key)",
     options: { prompt: { type: "boolean" }, check: { type: "boolean" } },
     async run(a) {
       const sub = a.positionals[0] ?? "status";
@@ -39,6 +44,13 @@ export const linearCommands: Command[] = [
       }
       if (sub === "logout") {
         console.log((await linearLogout(macKeychain())) ? "Signed out of Linear and revoked PMX's access." : "Not signed in to Linear.");
+        return 0;
+      }
+      if (sub === "key") {
+        const v = (await a.ask.secret("Linear API key with access to the PMX project (blank to cancel)")).trim();
+        if (!v) return 0;
+        await macKeychain().set("linear-token", v);
+        console.log("Saved the Linear API key in the keychain. PMX now talks to Linear directly; the Claude sync task is no longer needed on this Mac.");
         return 0;
       }
       const ctx = await a.ctx();
@@ -58,15 +70,23 @@ export const linearCommands: Command[] = [
         console.log(`Linear: ${await linearMode(ctx)}`);
         return 0;
       }
-      throw new Error(`Unknown subcommand "${sub}". Use login, logout, status or relay.`);
+      throw new Error(`Unknown subcommand "${sub}". Use status, relay or key.`);
     },
   },
   {
     name: "schedule",
     summary: "The scheduled tasks PMX needs in your Claude app and whether each exists; type /pmx-schedule in the Claude app to create them",
-    usage: "pmx schedule [--json] | pmx schedule --install-skill",
-    options: { json: { type: "boolean" }, "install-skill": { type: "boolean" } },
+    usage: "pmx schedule [--json] | pmx schedule --install-skill | pmx schedule --allow",
+    options: { json: { type: "boolean" }, "install-skill": { type: "boolean" }, allow: { type: "boolean" } },
     async run(a) {
+      if (a.values.allow) {
+        const r = await addAllowRules();
+        if (r.error) throw new Error(r.error);
+        console.log(r.added.length
+          ? `Added to ${claudeSettingsFile()}: ${r.added.join(", ")}. PMX's scheduled runs no longer stop to ask before running pmx or touching ~/.pmx.`
+          : `${claudeSettingsFile()} already allows PMX's command and folder.`);
+        return 0;
+      }
       if (a.values["install-skill"]) {
         const r = await installAppSkill();
         console.log(r === "kept-yours"

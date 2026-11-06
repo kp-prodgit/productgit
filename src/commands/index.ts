@@ -6,10 +6,10 @@ import { exec } from "../core/exec.js";
 import { readJson } from "../core/fsutil.js";
 import { effectiveTeam } from "../core/services.js";
 import { macKeychain } from "../core/keychain.js";
-import { macLaunchd } from "../core/launchd.js";
+import { capTickLogs, macLaunchd } from "../core/launchd.js";
 import { runDigest } from "./digest.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
-import { runInit, type InviteFile } from "./init.js";
+import { nextSteps, runInit, type InviteFile } from "./init.js";
 import { runStatus } from "./status.js";
 import { digestStep, runTick, type TickStep } from "./tick.js";
 import { runUninstall } from "./uninstall.js";
@@ -73,12 +73,14 @@ export const commands: Command[] = [
     options: { ...yes, invite: { type: "string" } },
     async run(a) {
       const invite = a.values.invite ? await readJson<InviteFile>(a.values.invite) : null;
-      await runInit({
+      const personal = await runInit({
         ask: a.ask, keychain: macKeychain(), launchd: macLaunchd(), exec, out: consoleOut, now: () => new Date(),
         cliPath: a.cliPath, invite, onInvite: inviteHook,
       });
       const r = formatDoctor(await doctorChecks());
       console.log("\n" + r.text);
+      const team = await loadTeamConfig(personal.repoPath).catch(() => null);
+      if (team) console.log("\n" + (await nextSteps(team, personal)));
       return 0;
     },
   },
@@ -117,6 +119,7 @@ export const commands: Command[] = [
     summary: "One scheduler pass (run by launchd every 30 minutes)",
     options: {},
     async run(a) {
+      await capTickLogs();
       const ctx = await a.ctx();
       for (const line of await runTick(ctx, tickSteps)) console.log(`${new Date().toISOString()} ${line}`);
       return 0;
