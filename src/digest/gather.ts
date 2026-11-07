@@ -7,6 +7,7 @@ import type { SignalItem } from "../core/types.js";
 import { readSlack } from "../sources/slack.js";
 import { readTranscripts } from "../sources/transcripts.js";
 import { meetingKeys } from "../meetings/ledger.js";
+import { runCanaries } from "../core/canary.js";
 
 export interface Gathered {
   items: SignalItem[];
@@ -14,7 +15,7 @@ export interface Gathered {
   heldItems: number;
   read: number;
   /** The parts of the run receipt that gathering decides (PRIV-4). */
-  receipt: Pick<RunReceipt, "window" | "rules" | "skippedSources" | "sources" | "masked">;
+  receipt: Pick<RunReceipt, "window" | "rules" | "skippedSources" | "sources" | "masked" | "canaries">;
 }
 
 /**
@@ -77,6 +78,7 @@ export async function gather(ctx: Ctx, o: { days: number; scope: "personal" | "t
       skippedSources,
       sources: sourceReceipts(filtered.decisions, (t) => titles.redact(t)),
       masked: { ...r.counts },
+      canaries: runCanaries(rules),
     },
   };
 }

@@ -18,8 +18,9 @@ export type RunLogEntry =
       outcome: "ok" | "failed" | "capped" | "refused"; durationMs: number; tokens: number | null; costUsd: number | null;
       runtime: string; fencingToken?: number } & Base)
   | ({ type: "digest"; outcome: "approved" | "rejected" | "staged"; items: number; held: number; durationMs: number;
-      tokens: number | null; costUsd: number | null } & Base)
-  | ({ type: "synthesize"; posted: number; held: number; durationMs: number; tokens: number | null; costUsd: number | null } & Base)
+      tokens: number | null; costUsd: number | null; receipt?: string } & Base)
+  /** `receipt` is the run's receipt ID on the machine that ran it (FLOW-1): a timestamp, no content. */
+  | ({ type: "synthesize"; posted: number; held: number; durationMs: number; tokens: number | null; costUsd: number | null; receipt?: string } & Base)
   | ({ type: "verdict"; taskId: string; category: string; size: string; verdict: "accepted" | "rejected" | "redo";
       reviewMinutes: number | null; editSize: number | null } & Base)
   | ({ type: "release"; taskId: string; reason: "stale" | "manual" | "redo" | "failed" | "brain" } & Base)

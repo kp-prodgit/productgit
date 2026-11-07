@@ -1,5 +1,6 @@
 import { SIZES, STATUSES, type Size, type Status, type Task } from "../core/types.js";
 import type { Fetch } from "../sources/slack.js";
+import { CANARY_REFUSAL, hasCanary } from "../core/canary.js";
 import { meetingDescription, type MeetingEntry, type NewTask, type Tracker } from "./types.js";
 
 /**
@@ -169,6 +170,7 @@ export function linearTracker(o: LinearOpts): Tracker {
       return toTask(await inProject(id));
     },
     async createInbox(t: NewTask) {
+      if (hasCanary(t.title + t.description)) throw new Error(CANARY_REFUSAL);
       const labelIds = [await label("status", "inbox"), await label("category", t.category), await label("size", t.size)];
       const d = await gql(`mutation($i: IssueCreateInput!) { issueCreate(input: $i) { issue { ${ISSUE_FIELDS} } } }`, {
         i: { teamId: await team(), projectId: o.projectId, title: t.title, description: t.description, labelIds },
@@ -197,6 +199,7 @@ export function linearTracker(o: LinearOpts): Tracker {
       return (await allIssues()).filter((n) => kindOf(n) === "meeting").map(toMeeting);
     },
     async lodgeMeeting(m) {
+      if (hasCanary(m.title)) throw new Error(CANARY_REFUSAL);
       const labelIds = [await label("kind", "meeting"), await label("status", "running"), await label("agent", m.agent)];
       const d = await gql(`mutation($i: IssueCreateInput!) { issueCreate(input: $i) { issue { ${ISSUE_FIELDS} } } }`, {
         i: { teamId: await team(), projectId: o.projectId, title: `Meeting · ${m.title} · ${m.at}`, description: meetingDescription(m), labelIds },

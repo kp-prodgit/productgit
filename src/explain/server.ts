@@ -9,10 +9,13 @@ import { parseRubric } from "../core/skillcheck.js";
 import { loadSkill, skillInventory, SKILL_USES } from "../core/skills.js";
 import { FLAG_TEXT } from "../synth/synthesize.js";
 import { page } from "./page.js";
+import { flowPage } from "../flow/page.js";
+import type { FlowGraph } from "../flow/graph.js";
 import { resolveLive } from "./resolve.js";
 
 export interface ExplainServer {
   url: string;
+  flowUrl: string;
   port: number;
   server: Server;
   close(): Promise<void>;
@@ -24,7 +27,11 @@ export interface ExplainServer {
  * header on every API call. The API answers only GET with that token and a loopback Host. Scripts and
  * styles need a per-response nonce, so nothing injected into a receipt can run.
  */
-export async function startExplainServer(o: { team: TeamConfig; personal: PersonalConfig; port?: number }): Promise<ExplainServer> {
+export async function startExplainServer(o: {
+  team: TeamConfig; personal: PersonalConfig; port?: number;
+  /** The flow view's graph (FLOW-2): "mine" is this Mac at the local level, "team" the shared run log. */
+  flow?: (hours: number, scope: "mine" | "team") => Promise<FlowGraph>;
+}): Promise<ExplainServer> {
   const token = randomBytes(24).toString("base64url");
   const want = Buffer.from(`Bearer ${token}`);
   let port = 0;
@@ -38,7 +45,13 @@ export async function startExplainServer(o: { team: TeamConfig; personal: Person
   };
   const json = (res: ServerResponse, status: number, body: unknown) => send(res, status, "application/json; charset=utf-8", JSON.stringify(body));
 
-  const api = async (path: string): Promise<[number, unknown]> => {
+  const api = async (path: string, query: URLSearchParams): Promise<[number, unknown]> => {
+    if (path === "/api/flow") {
+      if (!o.flow) return [404, { error: "not found" }];
+      const hours = Number(query.get("hours") ?? 24);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 336) return [400, { error: "hours must be 1 to 336" }];
+      return [200, { graph: await o.flow(hours, query.get("scope") === "team" ? "team" : "mine") }];
+    }
     if (path === "/api/runs") {
       const ids = await listReceipts();
       const runs = [];
@@ -82,17 +95,18 @@ export async function startExplainServer(o: { team: TeamConfig; personal: Person
       const host = req.headers.host ?? "";
       if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return send(res, 403, "text/plain", "Forbidden");
       if (req.method !== "GET") return send(res, 405, "text/plain", "Method not allowed", { allow: "GET" });
-      const path = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
-      if (path === "/") {
+      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      const path = url.pathname;
+      if (path === "/" || (path === "/flow" && o.flow)) {
         const nonce = randomBytes(16).toString("base64");
-        return send(res, 200, "text/html; charset=utf-8", page(nonce), {
+        return send(res, 200, "text/html; charset=utf-8", path === "/flow" ? flowPage(nonce) : page(nonce), {
           "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
         });
       }
       if (!path.startsWith("/api/")) return send(res, 404, "text/plain", "Not found");
       const given = Buffer.from(req.headers.authorization ?? "");
       if (given.length !== want.length || !timingSafeEqual(given, want)) return json(res, 403, { error: "missing or wrong token: run `pmx explain --web` again" });
-      const [status, body] = await api(path);
+      const [status, body] = await api(path, url.searchParams);
       return json(res, status, body);
     } catch (e: any) {
       return json(res, 500, { error: String(e?.message ?? e) });
@@ -102,6 +116,7 @@ export async function startExplainServer(o: { team: TeamConfig; personal: Person
   port = (server.address() as AddressInfo).port;
   return {
     url: `http://127.0.0.1:${port}/#t=${token}`,
+    flowUrl: `http://127.0.0.1:${port}/flow#t=${token}`,
     port,
     server,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),

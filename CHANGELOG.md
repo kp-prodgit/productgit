@@ -2,6 +2,53 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.11.0: see where your data went
+
+A flow view of everything PMX does, built from records it keeps. The goal is that you can check, rather than trust, that no confidential meeting reached Linear.
+
+- **`pmx flow --web` (FLOW-1, FLOW-2).** A page on this Mac with six columns:
+  - Arrivals: meetings and Slack threads, with their connector.
+  - Checkpoint: what your rules held, and why.
+  - Workshop: the runs, with the skill and version each used.
+  - Tasks: proposed tasks, with size and reason.
+  - Linear: the issues they became, and the meeting ledger.
+  - Departures: agent runs, review verdicts, time and cost.
+
+  The page also has:
+  - **Trace:** click anything to light its path both ways.
+  - **Lenses:** recolor by privacy, skills, cost or time.
+  - **Run filter:** pick one run to see only its path.
+  - **3D days:** stacks each day as a layer; turn the stack and pick a day.
+  - **Spend:** shown against your daily cap, in USD. PMX can't read your Claude plan's usage.
+  - **Held meetings:** shown by the file and title found again in your folders, on your screen only.
+
+  `pmx flow` prints the same claims in Terminal.
+- **The audit and its seal (FLOW-3).** "N held · 0 reached Linear", backed by checks you can open:
+  - every held meeting's identity is compared against Linear's meeting ledger;
+  - every task cites only sources that passed;
+  - nothing queued for Linear carries a canary;
+  - the run log's hash chain is intact.
+- **Canaries (FLOW-3).** Every run tests fake confidential meetings against its own rules in memory: a 1:1, an internal-only meeting, pay, performance and health passages, and your own do-not-read entries. Each run records the result. `pmx doctor` fails if one gets through. Both Linear paths refuse anything carrying a canary.
+- **A live Claude artifact (FLOW-4, FLOW-5).**
+  - `pmx mcp` is a read-only local server; `pmx mcp --install` registers it with the Claude desktop app.
+  - `/pmx-flow` publishes the same view as an artifact that reads PMX on the viewer's own Mac.
+  - The server gives the artifact held meetings by rule and number only. Titles, files, hashes, details and to-do text stay on the Mac.
+- **The team view (FLOW-7).** Pick "Team" to see the shared run log's runs, agent runs and verdicts, with no meeting content.
+- **Edits that only tighten (FLOW-6).**
+  - `pmx never-ingest add --title|--person|--channel`, and the artifact's "Stop reading meetings like this", add to your do-not-read list.
+  - Before saving, they preview what the rule would have held in the last 14 days.
+  - The edit log records only that a rule was added, never the entry.
+  - Loosening a rule stays in Terminal.
+- **Records that make the links real.**
+  - Each task records the Linear issue it became, or the one it duplicated. Through the Claude relay, `PENDING-…` identifiers resolve after the next sync.
+  - Receipts keep each source's connector and Slack channel, and held meetings' identity hashes.
+  - The run log's synthesis and digest entries name their receipt.
+  - Each day's cap is kept.
+  - The collection task reports how many meetings it skipped before saving, as counts only.
+  - Receipts are kept for the full 14 days at hourly runs.
+- **The Linear sync and meeting collection write files with Claude's file tool**, not a shell command. A shell command stopped for an approval nobody saw.
+- **Fix: `pmx login` signs in to the hosted app again.** In 0.10.1 the new profile sign-in took that name and hid it. PMX's own Claude profile now signs in with `pmx claude login`, and `pmx claude` shows whether it's signed in. A test now fails if two commands share a name.
+
 ## 0.10.1: runs that fail say so
 
 Fixes from a tester's install on Node 22.2 with Claude Code installed by npm under nvm. Their background job failed every 30 minutes for over a day, and nothing showed it.

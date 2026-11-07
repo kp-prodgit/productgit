@@ -4,7 +4,7 @@ This guide is written for **Claude Code** to follow on a PM's Mac. To use it, op
 
 > Install PMX following https://github.com/kp-prodgit/productgit/blob/main/INSTALL.md
 
-Version: **0.10.1**. Package: `productgit-0.10.1.tgz` from the [v0.10.1 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.10.1).
+Version: **0.11.0**. Package: `productgit-0.11.0.tgz` from the [v0.11.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.11.0).
 
 ---
 
@@ -53,19 +53,19 @@ Download the package and its checksum file into a new empty folder, check the ch
 
 ```bash
 d="$(mktemp -d)" && cd "$d"
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.1/productgit-0.10.1.tgz
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.1/SHA256SUMS
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.11.0/productgit-0.11.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.11.0/SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-npm install -g ./productgit-0.10.1.tgz
+npm install -g ./productgit-0.11.0.tgz
 ```
 
-If `shasum` doesn't print `productgit-0.10.1.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
+If `shasum` doesn't print `productgit-0.11.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
 
 **Joining a team that already uses PMX?** Install your team's version instead. Clone the team's PMX repo (ask the team lead for its URL), then run `npm install -g <repo>/.pmx/cli/productgit.tgz`.
 
 ### Step 3: verify
 
-- `pmx --version` prints `0.10.1`, or the team's version.
+- `pmx --version` prints `0.11.0`, or the team's version.
 - `command -v pmx` is inside the folder `npm prefix -g` printed.
 
 If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user to open a new Terminal window, or add `$(npm prefix -g)/bin` to their PATH.
@@ -77,14 +77,14 @@ If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user t
 Tell the user beforehand:
 - **The PMX repo** holds the team's shared skills, memory and settings. On their own: accept the default, and PMX creates one at `~/pmx`. Joining a team: give the folder where they cloned the team repo.
 - **Every answer is checked.** If they paste something by mistake, init asks again. At the end it shows a summary, and nothing is saved until they confirm.
-- **Sign in when asked.** PMX runs Claude Code with its own profile, so the user's personal setup never loads, and that profile needs its own sign-in. Init opens the browser for it. Without it, every agent run fails with "Not logged in". `pmx login` does it later.
+- **Sign in when asked.** PMX runs Claude Code with its own profile, so the user's personal setup never loads, and that profile needs its own sign-in. Init opens the browser for it. Without it, every agent run fails with "Not logged in". `pmx claude login` does it later.
 - **Say yes** to the background job, to the `/pmx-schedule` command, and to "Let PMX's scheduled tasks run pmx…". Without the last one, scheduled runs stop at permission prompts nobody sees.
 
 ### Step 5: check the install
 
 Run `pmx doctor --json` and read the result:
 - `ok: true` means every required check passed. Read each id in `warnings` to the user, with its `detail` from `checks`.
-- When `ok` is false, `failed` lists the failed check ids. Find each one in `checks`, and read its `detail` to the user: it says what to do. The common ones: `profile.signed-in` (the user runs `pmx login`) and `schedule.job-claude` (the user runs `pmx init` again and says yes to the background job).
+- When `ok` is false, `failed` lists the failed check ids. Find each one in `checks`, and read its `detail` to the user: it says what to do. The common ones: `profile.signed-in` (the user runs `pmx claude login`) and `schedule.job-claude` (the user runs `pmx init` again and says yes to the background job).
 
 ### Step 6: scheduled tasks in the Claude app
 
@@ -101,7 +101,8 @@ Tell the user:
 - the doctor result, with any warnings left;
 - which scheduled tasks exist;
 - that they can switch auto mode back on now;
-- that `pmx update` keeps PMX current, and that the team lead uses `pmx update --latest` and then `pmx vendor --require`.
+- that `pmx update` keeps PMX current, and that the team lead uses `pmx update --latest` and then `pmx vendor --require`;
+- that `pmx flow --web` shows where their data went (meetings read and held, tasks, Linear issues, agent runs, spend), and that `pmx flow --install-skill` then `/pmx-flow` puts the same view in Claude (it also needs `pmx mcp --install`, which they run themselves).
 
 ---
 

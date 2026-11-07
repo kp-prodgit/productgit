@@ -72,7 +72,7 @@ details { margin-top: 8px; } summary { cursor: pointer; color: var(--accent); fo
 </head>
 <body>
 <header>
-  <h1>How PMX decided</h1>
+  <h1>How PMX decided <a id="flowlink" class="small" href="/flow" hidden>See where data went →</a></h1>
   <p>Everything here comes from your own Mac. Text that PMX left out is never stored; file names and lines are found again in your folders when you open this page.</p>
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="run" aria-selected="true">Last run</button>
@@ -93,6 +93,12 @@ details { margin-top: 8px; } summary { cursor: pointer; color: var(--accent); fo
 // the address bar and history.
 const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
 history.replaceState(null, "", location.pathname);
+fetch("/api/flow?hours=1", { headers: { authorization: "Bearer " + token } }).then((r) => {
+  if (r.status === 404) return;
+  const a = document.getElementById("flowlink");
+  a.href = "/flow#t=" + encodeURIComponent(token);
+  a.hidden = false;
+}, () => {});
 
 function h(tag, cls, ...kids) {
   const e = document.createElement(tag);

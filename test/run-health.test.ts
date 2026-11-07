@@ -38,7 +38,7 @@ describe("0.10.1: runs that fail say why, and doctor catches it first", () => {
     const r = await claudeCode(fakeClaude({ run: notLoggedIn })).run({ team, cwd: ".", prompt: "say ok", tools: [] });
     expect(r.ok).toBe(false);
     expect(r.error).toContain("Not logged in");
-    expect(r.error).toContain("pmx login");
+    expect(r.error).toContain("pmx claude login");
     expect(r.error).not.toMatch(/^success$/);
 
     const capped = await claudeCode(fakeClaude({ run: { subtype: "error_max_turns", is_error: false, result: "" } })).run({ team, cwd: ".", prompt: "x", tools: [] });
@@ -47,7 +47,7 @@ describe("0.10.1: runs that fail say why, and doctor catches it first", () => {
 
   it("checks that PMX's own Claude profile is signed in, in doctor and before runs", async () => {
     expect(await profileSignedIn(fakeClaude({ loggedIn: true }))).toMatchObject({ ok: true });
-    expect(await profileSignedIn(fakeClaude({ loggedIn: false }))).toMatchObject({ ok: false, detail: expect.stringContaining("pmx login") });
+    expect(await profileSignedIn(fakeClaude({ loggedIn: false }))).toMatchObject({ ok: false, detail: expect.stringContaining("pmx claude login") });
     // An older Claude Code without `auth status` can't say: no check rather than a false alarm.
     const old: Exec = async (cmd, args, o) => (cmd === "claude" ? { stdout: "2.1.0 (Claude Code)", stderr: "", code: args[0] === "--version" ? 0 : 1 } : exec(cmd, args, o));
     expect(await profileSignedIn(old)).toBeNull();
@@ -160,5 +160,16 @@ describe("0.10.1: an unsupported Node stops the install, not a later command", (
     const old = await run("22.2.0");
     expect(old.code).toBe(1);
     expect(old.text).toMatch(/brew install node[\s\S]*nvm install 24 && nvm alias default 24[\s\S]*new Terminal[\s\S]*Install pmx again[\s\S]*pmx init/);
+  });
+});
+
+describe("0.11.0: every command name is unique", () => {
+  it("never lets a new command hide an older one (0.10.1's `pmx login` hid the hosted-app sign-in)", async () => {
+    const { commands } = await import("../src/commands/index.js");
+    const { registerEe } = await import("../ee/src/index.js");
+    const names = [...commands, ...registerEe()].map((c) => c.name);
+    expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+    expect(commands.find((c) => c.name === "login")!.summary).toMatch(/hosted app/);
+    expect(commands.find((c) => c.name === "claude")!.usage).toMatch(/pmx claude login/);
   });
 });

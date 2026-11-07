@@ -23,6 +23,8 @@ import { teamSkillPath } from "../core/skills.js";
 import type { RunLogEntry } from "../core/runlog.js";
 import { SIZES, type Size } from "../core/types.js";
 import { tickHealth } from "./tick.js";
+import { runCanaries } from "../core/canary.js";
+import { mcpInstalled } from "../mcp/server.js";
 
 export interface DoctorDeps {
   team: TeamConfig | null;
@@ -137,6 +139,15 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   }
   const cloud = st.cloudVersions;
   if (cloud?.latest) add("cli.latest", (compareVersions(cloud.latest, current) ?? 0) <= 0, `latest release is pmx ${cloud.latest}`, "warn");
+
+  // FLOW-3: fake confidential meetings must be held by today's rules and this PM's do-not-read list.
+  const can = runCanaries({ internalDomains: d.team.internalDomains, requireExternalParticipant: true, neverIngest: d.personal.neverIngest, allowOneOnOne: false });
+  add("privacy.canaries", !can.failed.length, can.failed.length ? `privacy rules let ${can.failed.length} test meeting(s) through (${can.failed.join(", ")}): nothing is sent, but check internalDomains in pmx.config.json and your do-not-read list` : `privacy rules hold all ${can.total} test meetings (1:1, internal-only, pay, performance, health${can.total > 5 ? ", do-not-read" : ""})`);
+  // FLOW-5: a published flow page reads this Mac through the local server.
+  if (d.personal.flow?.url) {
+    const on = await mcpInstalled();
+    add("flow.mcp", on, on ? `flow view ${d.personal.flow.url} can reach PMX on this Mac` : "the /pmx-flow page can't reach PMX on this Mac: run `pmx mcp --install`, then restart the Claude app", "warn");
+  }
 
   const loose: string[] = [];
   for (const dir of [paths.home(), paths.staging(), paths.receipts(), paths.transcripts()]) {

@@ -277,8 +277,8 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   if ((await profileSignedIn(d.exec))?.ok === false) {
     out.info("PMX runs Claude Code with its own profile (~/.pmx/claude), so your personal setup never loads. It needs its own sign-in.");
     if (await ask.confirm("Sign in PMX's Claude profile now? (opens your browser)", true)) {
-      if ((await (d.login ?? loginProfile)(d.exec)) !== 0) out.warn("Sign-in didn't finish. Run `pmx login` later; agent runs fail until then.");
-    } else out.warn("Agent runs fail until PMX's profile is signed in. Run `pmx login` later.");
+      if ((await (d.login ?? loginProfile)(d.exec)) !== 0) out.warn("Sign-in didn't finish. Run `pmx claude login` later; agent runs fail until then.");
+    } else out.warn("Agent runs fail until PMX's profile is signed in. Run `pmx claude login` later.");
   }
   if (await ask.confirm("Register the background job (runs `pmx tick` every 30 minutes)?", true)) {
     await mkdir(paths.logs(), { recursive: true });
@@ -319,6 +319,7 @@ export async function nextSteps(team: TeamConfig, personal: PersonalConfig): Pro
     ? "  1. Open the Claude desktop app (Code tab), start a session with auto mode off, and type /pmx-schedule. Claude creates PMX's scheduled tasks; click \"Run now\" on each once."
     : "  1. Run `pmx schedule` and paste what it prints into the Claude desktop app (Code tab), in a session with auto mode off.");
   lines.push(`  2. Put call transcripts in ${personal.sources.transcriptDirs[0] ?? "a transcripts folder"} and run \`pmx digest\`.`);
+  lines.push("  3. See where your data goes (meetings read and held, tasks, Linear, agent runs, spend) with `pmx flow --web`.");
   const shared = boardUrl(team, personal);
   if (shared) lines.push(`Your team's board: ${shared.url}`);
   else if ((await checkBoard(team)).ok && (await appSkillInstalled(BOARD_SKILL))) lines.push("For the team board, type /pmx-board in the Claude app: Claude publishes it as a live artifact that reads Linear through your Linear connector.");

@@ -46,4 +46,5 @@ export function recordSpend(s: State, p: PersonalConfig, now: Date, usd: number 
   if (!usd) return;
   const day = ledgerDay(now, p.budget.resetHour);
   s.ledger[day] = Math.round(((s.ledger[day] ?? 0) + usd) * 10000) / 10000;
+  s.caps = { ...s.caps, [day]: p.budget.dailyUsd };
 }

@@ -24,7 +24,7 @@ The release package is prebuilt and has no dependencies, so installing it downlo
 
 ```bash
 pmx doctor        # green/red checklist, including every clean-profile check (--json for scripts)
-pmx login         # sign in PMX's own Claude profile, which agent runs use
+pmx claude login  # sign in PMX's own Claude profile, which agent runs use
 pmx digest        # this week's digest from your transcripts, approved before it's committed
 ```
 
@@ -38,6 +38,10 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `doctor` | Checklist; fails if any clean-profile check is missing; `--json` for install scripts and Claude |
 | `digest` | Weekly digest from allowlisted sources, every claim cited, approved before commit |
 | `status` | Config, kill switch, spend and recent runs |
+| `flow` | Where data went: meetings read and held, tasks, Linear issues, agent runs, skills and spend, with the privacy audit. `--web` opens it on this Mac; `--team` shows the shared run log; `--install-skill` adds `/pmx-flow`, which publishes it as a live Claude artifact |
+| `never-ingest` | Your do-not-read list; `add --title`, `--person` or `--channel` adds an entry and says what it would have held |
+| `mcp` | The read-only local server the `/pmx-flow` artifact reads through; `--install` registers it with the Claude desktop app |
+| `claude` | PMX's own Claude profile, which agent runs use: `login` signs it in |
 | `explain` | How a run decided: what was found, used, left out, cut and masked, which skills and model ran, why each task got its size, and the cost. `--web` opens a local page |
 | `skills` | The Claude skills PMX can use, what each does, when it runs, and whether your team's copy differs from the built-in one |
 | `linear` | How PMX reaches Linear: through your Claude app's Linear connector by default (`status`); `key` stores an API key instead (advanced) |
@@ -111,6 +115,7 @@ The brain runs on one of your team's machines on your own Claude plan, so task t
 - **Shared team memory (B4).** `memory/` in the PMX repo, loaded through the project `CLAUDE.md`, changed only by code-owner-reviewed PR.
 - **Atomic claims.** A claim is a parentless commit pushed to `refs/pmx/claims/<task>`; only one push can win.
 - **Provable runs (B5, NEUT-3).** Each output PR carries `.pmx/runs/<task>.json`. CI recomputes the environment fingerprint from the repo and rejects records that don't match.
+- **See where data went (FLOW-1 to FLOW-7).** `pmx flow --web` shows every meeting read or held, the tasks, Linear issues, agent runs, skills and spend, with an audit that checks held meetings against Linear and fake confidential "canary" meetings that every run must hold. The `/pmx-flow` artifact shows the same in Claude, with held meetings by rule only.
 - **Explainable runs (PRIV-4).** Every digest and synthesis run leaves a receipt in `~/.pmx/receipts` (owner-only, 14 days, never in git). `pmx explain` shows it; left-out text is never stored, and file names and lines are found again in your own folders on screen.
 - **Meetings, once.** A scheduled task in your Claude app copies transcripts from your meeting connectors; PMX's own runs never get connectors. Team meetings are claimed and lodged in Linear, then marked done with the tasks they produced, so no meeting is processed twice. Your own to-dos may come from 1:1s, but stay on your Mac.
 - **Content-free analytics (PRIV-5).** Only after `pmx login`, and only IDs, sizes, outcomes, counts and cost. `pmx analytics --show` prints exactly what's waiting; `pmx analytics off` stops it.

@@ -67,6 +67,8 @@ export interface PersonalConfig {
   identity?: { names: string[]; emails: string[] } | null;
   /** The board this PM published from this Mac with /pmx-board, and with which pmx (BOARD-1). */
   board?: { url: string; version: string; publishedAt: string } | null;
+  /** The flow view this PM published from this Mac with /pmx-flow (FLOW-5). It reads this Mac only, so it's never a team setting. */
+  flow?: { url: string; version: string; publishedAt: string } | null;
 }
 
 export const DEFAULT_TEAM: Omit<TeamConfig, "team"> = {

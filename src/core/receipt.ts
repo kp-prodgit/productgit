@@ -46,6 +46,8 @@ export interface RunReceipt {
   synth?: { tasks: TaskReceipt[]; skipped: string[] };
   /** Individual to-dos (TODO-1): what was added, and from which used source. Stays on this Mac. */
   todo?: { added: { text: string; source: string; due: string | null }[]; duplicates: number; dropped: string[] };
+  /** Fake confidential items run through this run's own rules in memory (FLOW-3). Each must be held. */
+  canaries?: { total: number; held: number; failed: string[] };
   error?: string;
 }
 
@@ -63,6 +65,15 @@ export interface SourceReceipt {
   detail: string;
   passagesCut: { rule: HoldReason; hash: string }[];
   passagesUsed: number;
+  /** The connector a collected transcript came from (granola, fireflies…), or "file"; "slack" for Slack (FLOW-1). */
+  origin?: string;
+  /** Slack only: the allowlisted channel ID, from the permalink. */
+  channel?: string;
+  /**
+   * Left-out transcripts only: the meeting identity hashes (MEET-1), so the flow view can check that no held
+   * meeting ever reached the Linear meeting ledger (FLOW-3). Hashes only; never shown or shared.
+   */
+  keys?: string[];
   /** Team runs: where this meeting stood in the team's meeting ledger (MEET-2). */
   ledger?: { state: "processed-now" | "already-processed" | "in-progress-elsewhere" | "before-window" | "would-process"; entry: string | null };
 }
@@ -73,6 +84,11 @@ export interface TaskReceipt {
   size: Size;
   sources: string[];
   sizing: Sizing | null;
+  /**
+   * Where it went (FLOW-1): the Linear identifier it was created as (PENDING-… through the Claude relay until
+   * the next sync; the flow view resolves it), the existing task it duplicated, or nowhere on a dry run.
+   */
+  posted?: { identifier: string } | { duplicateOf: string } | { dryRun: true };
 }
 
 export type SizeFlag = "no-reason" | "cell-mismatch" | "count-below" | "count-above";
@@ -94,8 +110,12 @@ export const topicRulesHash = () =>
 
 export function sourceReceipts(decisions: ItemDecision[], titleOf: (t: string) => string): SourceReceipt[] {
   return decisions.map((d) => {
-    const base = { kind: d.item.kind, refHash: refHash(d.item.ref), detail: d.detail, passagesCut: d.passages, passagesUsed: d.passagesKept };
-    if (d.decision === "held") return { ...base, decision: "left-out", rule: d.rule };
+    const channel = d.item.kind === "slack" ? d.item.ref.match(/\/archives\/([A-Z0-9]+)\//)?.[1] : undefined;
+    const base = {
+      kind: d.item.kind, refHash: refHash(d.item.ref), detail: d.detail, passagesCut: d.passages, passagesUsed: d.passagesKept,
+      origin: d.item.kind === "slack" ? "slack" : d.item.origin?.source ?? "file", ...(channel ? { channel } : {}),
+    };
+    if (d.decision === "held") return { ...base, decision: "left-out", rule: d.rule, ...(d.item.keys?.length ? { keys: d.item.keys } : {}) };
     return { ...base, decision: "used", id: d.item.id, file: d.item.kind === "slack" ? d.item.ref : basename(d.item.ref), title: titleOf(d.item.title), at: d.item.at };
   });
 }
@@ -106,7 +126,8 @@ export function newReceiptId(type: RunReceipt["type"], at: Date): string {
 
 const ID = /^(digest|synthesize|todo)-\d{8}T\d{6}Z$/;
 const KEEP_DAYS = 14;
-const KEEP_MAX = 50;
+// Hourly runs make about 50 receipts a week, so 400 keeps the full 14 days the flow view looks back over.
+const KEEP_MAX = 400;
 
 export async function writeReceipt(r: RunReceipt, now = new Date()): Promise<void> {
   await privateDir(paths.home());

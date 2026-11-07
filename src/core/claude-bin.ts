@@ -59,7 +59,7 @@ export async function claudeAbsolutePath(exec: Exec, pathEnv = process.env.PATH 
 }
 
 /** The command that signs in PMX's own Claude profile. Each config folder has its own sign-in. */
-export const LOGIN_HINT = "run `pmx login` (it signs in PMX's own Claude profile, separate from your usual one)";
+export const LOGIN_HINT = "run `pmx claude login` (it signs in PMX's own Claude profile, separate from your usual one)";
 
 /**
  * Whether PMX's clean profile is signed in, from `claude auth status`. Null when Claude Code is missing or too

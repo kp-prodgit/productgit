@@ -30,7 +30,7 @@ export async function runDigest(ctx: Ctx, ask: Asker, o: { stage?: boolean; revi
     const held = totalHeld(draft.held);
     ctx.out.info(receiptSummary(draft.receipt));
     await log.record({
-      type: "digest", agent: ctx.agent, machine: ctx.personal.machineId, outcome: "staged", items: draft.items, held,
+      type: "digest", agent: ctx.agent, machine: ctx.personal.machineId, receipt: draft.receipt.id, outcome: "staged", items: draft.items, held,
       durationMs: draft.result.durationMs, tokens: draft.result.tokens, costUsd: draft.result.costUsd,
     });
     await updateState((s) => recordSpend(s, ctx.personal, ctx.now(), draft.result.costUsd));

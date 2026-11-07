@@ -33,6 +33,8 @@ import { cloudCommands } from "./cloud.js";
 import { companyStep, meetingCommands, todoStep } from "./meetings.js";
 import { updateStep } from "./autoupdate.js";
 import { linearCommands } from "./linear.js";
+import { flowCommands } from "./flow.js";
+import { loadFlowGraph } from "../flow/graph-load.js";
 import { syncAnalytics } from "../cloud/account.js";
 
 export interface RunArgs {
@@ -103,15 +105,20 @@ export const commands: Command[] = [
     },
   },
   {
-    name: "login",
-    summary: "Sign in PMX's own Claude profile (~/.pmx/claude), which agent runs use; separate from your usual Claude sign-in",
+    name: "claude",
+    summary: "PMX's own Claude profile (~/.pmx/claude), which agent runs use: `login` signs it in, separately from your usual Claude sign-in",
+    usage: "pmx claude [status] | pmx claude login",
     options: {},
-    async run() {
+    async run(a) {
       const before = await profileSignedIn(exec);
+      if (a.positionals[0] !== "login") {
+        console.log(before ? `${before.ok ? "✔" : "✘"} ${before.detail}.` : "PMX can't tell: Claude Code is missing or too old to report its sign-in.");
+        return before?.ok === false ? 1 : 0;
+      }
       if (before?.ok) console.log(`${before.detail}. Signing in again replaces it.`);
       const code = await loginProfile(exec);
       const after = await profileSignedIn(exec);
-      console.log(after?.ok ? `✔ ${after.detail}.` : "PMX's Claude profile still isn't signed in. Run `pmx login` again.");
+      console.log(after?.ok ? `✔ ${after.detail}.` : "PMX's Claude profile still isn't signed in. Run `pmx claude login` again.");
       return code === 0 && after?.ok !== false ? 0 : 1;
     },
   },
@@ -157,7 +164,8 @@ export const commands: Command[] = [
       const personal = await loadPersonalConfig();
       const team = await loadTeamConfig(personal.repoPath);
       if (a.values.web) {
-        const s = await startExplainServer({ team, personal });
+        const ctx = await a.ctx();
+        const s = await startExplainServer({ team, personal, flow: (hours, scope) => loadFlowGraph(ctx, { level: scope === "team" ? "team" : "local", hours }) });
         await exec("open", [s.url]);
         console.log(`How PMX decided: ${s.url}\nOnly this Mac can open it. Press Ctrl+C to stop.`);
         await new Promise<void>((resolve) => process.on("SIGINT", () => s.close().then(resolve)));
@@ -265,6 +273,7 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
   ...meetingCommands,
   ...linearCommands,
   ...teamCommands,
+  ...flowCommands,
   reviewCommand,
   ...cloudCommands,
   {

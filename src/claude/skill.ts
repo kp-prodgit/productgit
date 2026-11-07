@@ -11,7 +11,8 @@ import { packageRoot } from "../core/skills.js";
  */
 export const APP_SKILL = "pmx-schedule";
 export const BOARD_SKILL = "pmx-board";
-export type AppSkill = typeof APP_SKILL | typeof BOARD_SKILL;
+export const FLOW_SKILL = "pmx-flow";
+export type AppSkill = typeof APP_SKILL | typeof BOARD_SKILL | typeof FLOW_SKILL;
 const MARKER = "Installed by Product Git";
 
 export const appSkillSource = (name: AppSkill = APP_SKILL) => join(packageRoot(), "app-skills", name, "SKILL.md");
@@ -44,7 +45,7 @@ export async function claudePresent(): Promise<boolean> {
 /** After an update, refreshes the commands PMX installed earlier. Never adds one the PM didn't install. */
 export async function refreshAppSkills(): Promise<AppSkill[]> {
   const out: AppSkill[] = [];
-  for (const name of [APP_SKILL, BOARD_SKILL] as const) {
+  for (const name of [APP_SKILL, BOARD_SKILL, FLOW_SKILL] as const) {
     const have = await readFile(appSkillTarget(name), "utf8").catch(() => null);
     if (have?.includes(MARKER) && (await installAppSkill(name)) === "updated") out.push(name);
   }

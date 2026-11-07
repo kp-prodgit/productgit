@@ -4,7 +4,7 @@ import { DATA_RULES, dataBlock } from "../core/prompt.js";
 import { RunLogStore } from "../core/runlog-store.js";
 import type { Services } from "../core/services.js";
 import { createHash } from "node:crypto";
-import { newReceiptId, writeReceipt, type RunReceipt, type SizeFlag, type Sizing } from "../core/receipt.js";
+import { newReceiptId, writeReceipt, type RunReceipt, type SizeFlag, type Sizing, type TaskReceipt } from "../core/receipt.js";
 import { parseRubric, type SizeRubric } from "../core/skillcheck.js";
 import { loadSkill, skillBody, SKILL_USES } from "../core/skills.js";
 import { updateState } from "../core/state.js";
@@ -189,16 +189,20 @@ export async function synthesize(
   }
 
   const { tasks, skipped } = parseCandidates(result.text, categories, new Set(work.map((i) => i.id)), parseRubric(rubric.text));
-  const existing = new Set((await svc.tracker.list()).filter((t) => t.status !== "done").map((t) => norm(t.title)));
+  const existing = new Map((await svc.tracker.list()).filter((t) => t.status !== "done").map((t) => [norm(t.title), t.identifier]));
   const posted: SynthResult["posted"] = [];
   const bySource = new Map<string, string[]>();
+  // Where each task went, for the receipt and the flow view (FLOW-1).
+  const went = new Map<CandidateTask, NonNullable<TaskReceipt["posted"]>>();
   for (const c of tasks) {
-    if (existing.has(norm(c.title))) { skipped.push(`${c.title}: already in the PMX project`); continue; }
-    if (o.dryRun) { posted.push({ identifier: "(dry run)", title: c.title }); continue; }
+    const dup = existing.get(norm(c.title));
+    if (dup) { skipped.push(`${c.title}: already in the PMX project`); went.set(c, { duplicateOf: dup }); continue; }
+    if (o.dryRun) { posted.push({ identifier: "(dry run)", title: c.title }); went.set(c, { dryRun: true }); continue; }
     const t = await svc.tracker.createInbox({ title: c.title, description: describe(c, work), category: c.category, size: c.size, sources: c.sources });
     posted.push({ identifier: t.identifier, title: t.title });
+    went.set(c, { identifier: t.identifier });
     for (const id of c.sources) bySource.set(id, [...(bySource.get(id) ?? []), t.identifier]);
-    existing.add(norm(c.title));
+    existing.set(norm(c.title), t.identifier);
   }
   // Mark each lodged meeting complete in the tracker, with the tasks it produced (MEET-2).
   for (const l of lodged) {
@@ -212,12 +216,12 @@ export async function synthesize(
   await release();
 
   receipt.outcome = o.dryRun ? "dry-run" : "posted";
-  receipt.synth = { tasks: tasks.map((c) => ({ title: c.title, category: c.category, size: c.size, sources: c.sources, sizing: c.sizing ?? null })), skipped };
+  receipt.synth = { tasks: tasks.map((c) => ({ title: c.title, category: c.category, size: c.size, sources: c.sources, sizing: c.sizing ?? null, ...(went.get(c) ? { posted: went.get(c) } : {}) })), skipped };
   await writeReceipt(receipt, ctx.now());
   if (!o.dryRun) {
     await updateState((s) => (s.lastSynthAt = ctx.now().toISOString()));
     await new RunLogStore(ctx).record({
-      type: "synthesize", agent: ctx.agent, machine: ctx.personal.machineId, posted: posted.length, held: totalHeld(g.held),
+      type: "synthesize", agent: ctx.agent, machine: ctx.personal.machineId, receipt: receipt.id, posted: posted.length, held: totalHeld(g.held),
       durationMs: result.durationMs, tokens: result.tokens, costUsd: result.costUsd,
     });
   }
