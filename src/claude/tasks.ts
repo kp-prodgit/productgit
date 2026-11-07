@@ -1,7 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { TeamConfig } from "../core/config.js";
 import type { Keychain } from "../core/keychain.js";
+import { loadState, updateState } from "../core/state.js";
 import { linearAccess } from "../linear/access.js";
 import { missingAllowRules } from "./permissions.js";
 import { appSkillInstalled, claudeAppHome } from "./skill.js";
@@ -76,6 +77,63 @@ export async function taskState(t: ClaudeTask): Promise<TaskState> {
   return body === t.prompt.trim() ? "current" : "outdated";
 }
 
+type Test = (n: number) => boolean;
+
+/** One cron field ("*", "5", "8-18", "12,17", "1-5") as a test. */
+const cronField = (f: string): Test => (n) =>
+  f === "*" || f.split(",").some((part) => {
+    const [a = NaN, b = a] = part.split("-").map(Number);
+    return n >= a && n <= b;
+  });
+
+/** The first time a five-field cron expression fires after `from`, in this Mac's local time, looking 8 days ahead. */
+export function nextCronTime(cron: string, from: Date): Date | null {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 5) return null;
+  const [mi, h, dom, mon, dow] = fields.map(cronField) as [Test, Test, Test, Test, Test];
+  const t = new Date(from);
+  t.setSeconds(0, 0);
+  for (let i = 0; i < 8 * 24 * 60; i++) {
+    t.setMinutes(t.getMinutes() + 1);
+    if (mi(t.getMinutes()) && h(t.getHours()) && dom(t.getDate()) && mon(t.getMonth() + 1) && dow(t.getDay())) return t;
+  }
+  return null;
+}
+
+const ago = (ms: number) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  return m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)} days ago`;
+};
+const localTime = (d: Date) => `${d.toDateString().slice(0, 10)} ${d.toTimeString().slice(0, 5)}`;
+
+/**
+ * Whether a task that's set up has actually run (CLAUDE-4), from what PMX saw: each run calls `--prompt` first and
+ * a last step at the end. `ok` is false when a run didn't finish or a scheduled time passed with no run at all.
+ */
+export async function taskRunHealth(t: ClaudeTask, now = new Date()): Promise<{ ok: boolean; detail: string }> {
+  const state = await loadState();
+  const run = state.taskRuns[t.id];
+  const open = "open it in the Claude app (Code tab → Scheduled → the task → Runs)";
+  if (run?.finishedAt) return { ok: true, detail: `last ran ${ago(now.getTime() - Date.parse(run.finishedAt))}` };
+  if (run) {
+    const since = now.getTime() - Date.parse(run.startedAt);
+    return since < 60 * 60000
+      ? { ok: true, detail: `running now (started ${ago(since)})` }
+      : { ok: false, detail: `last run started ${ago(since)} and didn't finish, usually because it's waiting for an approval nobody saw (often its first connector call). The app skips later runs while it waits: ${open}, and choose "Always allow"` };
+  }
+  // Runs before this pmx left no record, so the clock starts when tracking began, not when the task was written.
+  let since = state.taskRunsSince;
+  if (!since) {
+    since = now.toISOString();
+    await updateState((s) => (s.taskRunsSince ??= since)).catch(() => {});
+  }
+  const written = await stat(taskFile(t.id)).then((s) => s.mtime, () => null);
+  const from = written && written.getTime() > Date.parse(since) ? written : new Date(since);
+  const due = nextCronTime(t.cron, from);
+  if (due && due < now) return { ok: false, detail: `hasn't run since ${localTime(due)}, when it was due. Tasks run only while the Claude app is open and the Mac is awake, and not while an earlier run waits for an approval: ${open}` };
+  return { ok: true, detail: due ? `hasn't run yet; next run ${localTime(due)}` : "hasn't run yet" };
+}
+
 /** The request to paste into the Claude app. Claude creates the task from it. */
 export function pasteRequest(t: ClaudeTask): string {
   return `Create (or, if it exists, update) a scheduled task titled "${t.title}" with task ID ${t.id}, running ${t.schedule} (cron ${t.cron}), with exactly this prompt:
@@ -102,6 +160,7 @@ export const TASK_FACTS = [
   "They run on this Mac only: they call `pmx` and write to ~/.pmx, so don't move them to the cloud.",
   "Times are this Mac's local time. They run while the Claude app is open and the Mac is awake; a run missed while it was closed happens once when the app opens again.",
   "See them and each run's history in the Claude app: Code tab → Scheduled → the task → Runs.",
+  "PMX reads each task's prompt from ~/.claude/scheduled-tasks/<task ID>/SKILL.md, and sees a run when the task calls pmx. The schedule itself lives in the Claude app.",
 ];
 
 export async function formatTasks(team: TeamConfig | null, keychain: Keychain): Promise<string> {
@@ -111,7 +170,9 @@ export async function formatTasks(team: TeamConfig | null, keychain: Keychain): 
   for (const t of need) {
     const state = await taskState(t);
     if (state !== "current") todo.push(t);
-    lines.push(`${state === "current" ? "✔" : state === "outdated" ? "!" : "✘"} ${t.title}: ${state === "current" ? "set up" : state === "outdated" ? "set up with an older prompt" : "missing"}. It ${t.why}.`);
+    const ran = state === "missing" ? null : await taskRunHealth(t);
+    const mark = state === "missing" ? "✘" : state === "outdated" || !ran?.ok ? "!" : "✔";
+    lines.push(`${mark} ${t.title}: ${state === "current" ? "set up" : state === "outdated" ? "set up with an older prompt" : "missing"}${ran ? `; ${ran.detail}` : ""}. It ${t.why}.`);
   }
   const rules = await missingAllowRules();
   if (rules.length) lines.push("", `! Scheduled runs stop at permission prompts nobody answers. \`pmx schedule --allow\` adds always-allow rules for PMX's own command and folder to your Claude settings (${rules.join(", ")}).`);

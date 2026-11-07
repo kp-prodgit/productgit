@@ -1,5 +1,5 @@
 import type { TeamConfig } from "../core/config.js";
-import { resolveClaude } from "../core/claude-bin.js";
+import { LOGIN_HINT, profileSignedIn, resolveClaude } from "../core/claude-bin.js";
 import { exec as defaultExec, type Exec } from "../core/exec.js";
 import { cleanInvocation, profileChecks, type InvocationOpts } from "../core/profile.js";
 import type { AgentRuntime, ProbeResult, RunResult } from "./types.js";
@@ -13,6 +13,7 @@ export function claudeCode(exec: Exec = defaultExec): AgentRuntime {
       const v = await resolveClaude(exec);
       if (!v) problems.push("Claude Code is not installed (https://code.claude.com).");
       for (const c of await profileChecks(team)) if (!c.ok) problems.push(`clean profile: ${c.detail}`);
+      if (v && (await profileSignedIn(exec))?.ok === false) problems.push(`clean profile isn't signed in: ${LOGIN_HINT}`);
       return { ok: problems.length === 0, version: v?.version ?? null, problems };
     },
 
@@ -34,15 +35,27 @@ export function claudeCode(exec: Exec = defaultExec): AgentRuntime {
         .reduce((a, b) => a + b, 0);
       const subtype = String(out.subtype ?? "");
       const capped = /max_turns|budget/.test(subtype);
+      const ok = out.is_error === false && subtype === "success";
       return {
-        ok: out.is_error === false && subtype === "success",
+        ok,
         text: String(out.result ?? ""),
         costUsd: typeof out.total_cost_usd === "number" ? out.total_cost_usd : null,
         tokens: tokens || null,
         durationMs: Number(out.duration_ms ?? durationMs),
         capped,
-        error: out.is_error ? subtype || "error" : undefined,
+        error: ok ? undefined : runError(out),
       };
     },
   };
+}
+
+/**
+ * Claude's own words for a failed run. The subtype says "success" even when is_error is true
+ * (for example "Not logged in · Please run /login"), so the result text comes first.
+ */
+export function runError(out: any): string {
+  const said = String(out.result ?? "").trim();
+  const reason = String(out.terminal_reason ?? out.subtype ?? "").trim();
+  const text = said ? `${said}${reason && reason !== "success" ? ` (${reason})` : ""}` : reason && reason !== "success" ? reason : "Claude Code reported an error";
+  return /not logged in|\/login/i.test(said) ? `${text}. PMX's own Claude profile isn't signed in: ${LOGIN_HINT}` : text.slice(0, 2000);
 }

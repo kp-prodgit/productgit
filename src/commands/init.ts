@@ -8,7 +8,7 @@ import { hostname, homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { Asker } from "../core/ask.js";
 import { DEFAULT_TEAM, loadTeamConfig, savePersonalConfig, validateTeamConfig, type PersonalConfig, type Plan, type TeamConfig } from "../core/config.js";
-import { resolveClaude } from "../core/claude-bin.js";
+import { claudeAbsolutePath, loginProfile, profileSignedIn, resolveClaude } from "../core/claude-bin.js";
 import type { Exec } from "../core/exec.js";
 import { privateDir, readJson } from "../core/fsutil.js";
 import { Git } from "../core/git.js";
@@ -40,6 +40,8 @@ export interface InitDeps {
   invite?: InviteFile | null;
   /** Called after the invite is accepted (ee/), to sign in and fetch the policy. */
   onInvite?: (invite: InviteFile) => Promise<void>;
+  /** Signs in PMX's Claude profile; tests pass their own. */
+  login?: (exec: Exec) => Promise<number>;
 }
 
 const split = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -270,12 +272,19 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
     if (v) await d.keychain.set(name, v);
   }
 
-  // 5. Clean profile (B1) and the one launchd job.
+  // 5. Clean profile (B1) and the one launchd job. The profile has its own sign-in; without it every run fails.
   await writeProfile(team);
+  if ((await profileSignedIn(d.exec))?.ok === false) {
+    out.info("PMX runs Claude Code with its own profile (~/.pmx/claude), so your personal setup never loads. It needs its own sign-in.");
+    if (await ask.confirm("Sign in PMX's Claude profile now? (opens your browser)", true)) {
+      if ((await (d.login ?? loginProfile)(d.exec)) !== 0) out.warn("Sign-in didn't finish. Run `pmx login` later; agent runs fail until then.");
+    } else out.warn("Agent runs fail until PMX's profile is signed in. Run `pmx login` later.");
+  }
   if (await ask.confirm("Register the background job (runs `pmx tick` every 30 minutes)?", true)) {
     await mkdir(paths.logs(), { recursive: true });
-    await d.launchd.install(plist({ node: process.execPath, cli: d.cliPath, pmxHome: pmxHome() }));
-    out.info("Registered launchd job com.productgit.pmx.");
+    const claude = await claudeAbsolutePath(d.exec);
+    await d.launchd.install(plist({ node: process.execPath, cli: d.cliPath, pmxHome: pmxHome(), claude }));
+    out.info(`Registered launchd job com.productgit.pmx${claude ? `, using Claude Code at ${claude}` : ""}.`);
   }
   if (d.invite && d.onInvite) await d.onInvite(d.invite);
 

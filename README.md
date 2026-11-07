@@ -24,6 +24,7 @@ The release package is prebuilt and has no dependencies, so installing it downlo
 
 ```bash
 pmx doctor        # green/red checklist, including every clean-profile check (--json for scripts)
+pmx login         # sign in PMX's own Claude profile, which agent runs use
 pmx digest        # this week's digest from your transcripts, approved before it's committed
 ```
 
@@ -74,7 +75,7 @@ PMX can't create tasks in your Claude app itself, but Claude can. `pmx init` off
 - **Permissions.** A scheduled run stops at any permission prompt nobody answers, and blocks that task's later runs. `pmx init` offers, and `pmx schedule --allow` adds, always-allow rules for PMX's own command and folder (`Bash(pmx *)`, `Read(~/.pmx/**)`, `Edit(~/.pmx/**)`) to your Claude settings. Connectors still ask once, on the first "Run now".
 - **This Mac only.** The tasks call `pmx` and write to `~/.pmx`, so they can't run in the cloud.
 - **When they run.** Times are your Mac's local time. Tasks run while the Claude app is open and the Mac is awake; a run missed while the app was closed happens once when it opens again.
-- **Where to see them.** Claude app → Code tab → Scheduled → the task → Runs. `pmx schedule` and `pmx doctor` say which tasks are missing or out of date.
+- **Where to see them.** Claude app → Code tab → Scheduled → the task → Runs. `pmx schedule` and `pmx doctor` say which tasks are missing or out of date, when each last ran, and which ones haven't run or didn't finish. A run that waits for an approval blocks that task's later runs: open it and choose "Always allow".
 
 ### The board inside Claude
 

@@ -3,6 +3,7 @@ import type { Asker } from "../core/ask.js";
 import { loadPersonalConfig, loadTeamConfig, type PersonalConfig, type TeamConfig } from "../core/config.js";
 import { consoleOut, type Ctx } from "../core/context.js";
 import { exec } from "../core/exec.js";
+import { loginProfile, profileSignedIn } from "../core/claude-bin.js";
 import { readJson } from "../core/fsutil.js";
 import { effectiveTeam } from "../core/services.js";
 import { macKeychain } from "../core/keychain.js";
@@ -11,7 +12,7 @@ import { runDigest } from "./digest.js";
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { nextSteps, runInit, type InviteFile } from "./init.js";
 import { runStatus } from "./status.js";
-import { digestStep, runTick, type TickStep } from "./tick.js";
+import { digestStep, recordTick, runTick, type TickStep } from "./tick.js";
 import { runUninstall } from "./uninstall.js";
 import { VENDORED_CLI, vendorCli } from "../core/vendor.js";
 import { atLeast, currentVersion, vendoredVersion } from "../core/version.js";
@@ -102,6 +103,19 @@ export const commands: Command[] = [
     },
   },
   {
+    name: "login",
+    summary: "Sign in PMX's own Claude profile (~/.pmx/claude), which agent runs use; separate from your usual Claude sign-in",
+    options: {},
+    async run() {
+      const before = await profileSignedIn(exec);
+      if (before?.ok) console.log(`${before.detail}. Signing in again replaces it.`);
+      const code = await loginProfile(exec);
+      const after = await profileSignedIn(exec);
+      console.log(after?.ok ? `✔ ${after.detail}.` : "PMX's Claude profile still isn't signed in. Run `pmx login` again.");
+      return code === 0 && after?.ok !== false ? 0 : 1;
+    },
+  },
+  {
     name: "digest",
     summary: "Build this week's digest from your sources and approve it before it's committed",
     usage: "pmx digest [--review] [--stage] [--days 7]",
@@ -128,7 +142,9 @@ export const commands: Command[] = [
     async run(a) {
       await capTickLogs();
       const ctx = await a.ctx();
-      for (const line of await runTick(ctx, tickSteps)) console.log(`${new Date().toISOString()} ${line}`);
+      const lines = await runTick(ctx, tickSteps);
+      for (const line of lines) console.log(`${new Date().toISOString()} ${line}`);
+      await recordTick(lines);
       return 0;
     },
   },

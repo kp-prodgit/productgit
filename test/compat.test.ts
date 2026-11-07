@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -25,8 +26,8 @@ const V05 = new URL("./compat/v0.5.0/", import.meta.url).pathname;
 const old = (f: string) => join(OLD, f);
 
 describe("versions (COMPAT-1)", () => {
-  it("this release is 0.10.0 and versions compare by number", () => {
-    expect(currentVersion()).toBe("0.10.0");
+  it("this release's version comes from package.json, and versions compare by number", () => {
+    expect(currentVersion()).toBe(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
     expect(compareVersions("0.10.0", "0.9.0")).toBe(1);
     expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
     expect(compareVersions("dev", "1.0.0")).toBeNull();
@@ -202,12 +203,13 @@ describe("version handshake with the hosted app (COMPAT-5)", () => {
     }) as any;
     const cloud = new Cloud("https://api.test/v1", memoryKeychain({ "machine-token": "pmxm_x" }), f);
     await cloud.call("GET", "/me");
-    expect(seen[0]!["x-pmx-version"]).toBe("0.10.0");
+    expect(seen[0]!["x-pmx-version"]).toBe(currentVersion());
     expect((await loadState()).cloudVersions).toMatchObject({ latest: "0.7.0", min: "0.4.0" });
 
     status = 426;
     const err = await cloud.call("GET", "/me").catch((e) => e);
     expect(err).toBeInstanceOf(CloudError);
-    expect(err.message).toMatch(/needs pmx 99\.0\.0 or newer; this is 0\.10\.0.*pmx update/);
+    expect(err.message).toContain(`needs pmx 99.0.0 or newer; this is ${currentVersion()}.`);
+    expect(err.message).toContain("pmx update");
   });
 });

@@ -2,6 +2,17 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.10.1: runs that fail say so
+
+Fixes from a tester's install on Node 22.2 with Claude Code installed by npm under nvm. Their background job failed every 30 minutes for over a day, and nothing showed it.
+
+- **A failed run shows Claude's own error (RUN-ERR-1).** A run that wasn't signed in printed `Synthesis run failed: success`. Claude Code marks such a run as an error but its type stays "success", so PMX now shows Claude's message ("Not logged in · Please run /login") and the fix.
+- **`pmx login` signs in PMX's own Claude profile.** Runs use their own profile in `~/.pmx/claude`, so your personal setup never loads, and that profile needs its own sign-in. `pmx init` offers it, doctor fails while the profile isn't signed in, and runs stop before they start instead of failing.
+- **The background job finds Claude Code wherever your shell does.** `pmx init` saves the full path to Claude Code in the job and puts its folder on the job's PATH, so an npm install under nvm no longer fails with `spawn claude ENOENT`. Doctor fails when the job can't find Claude Code. Run `pmx init` again to fix a job registered by an older pmx.
+- **A job that keeps failing shows (OBS-2).** `pmx status` shows the job's last pass, and doctor warns after three failed passes in a row, with the first error and the log's path.
+- **"Set up" tasks that don't run show (CLAUDE-4).** `pmx schedule` and doctor show each task's last run. They warn when a run started and didn't finish, which usually means it waits for an approval nobody saw (the app skips later runs meanwhile), and when a task's scheduled time passed with no run. Runs from before this version left no record, so that clock starts at the update. `pmx schedule` also says where the task files are.
+- **An unsupported Node stops the install,** with the steps in order: install Node 24 (Homebrew, or `nvm install 24 && nvm alias default 24`), open a new Terminal, install pmx again, run `pmx init`. Doctor gives the same steps.
+
 ## 0.10.0: a solo install that works
 
 Fixes from a first-time install, so one PM can install PMX on a fresh Mac without help.

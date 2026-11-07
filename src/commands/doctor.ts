@@ -1,5 +1,5 @@
-import { neededTasks, taskState } from "../claude/tasks.js";
-import { nodeSupported, resolveClaude } from "../core/claude-bin.js";
+import { neededTasks, taskRunHealth, taskState } from "../claude/tasks.js";
+import { nodeSupported, profileSignedIn, resolveClaude } from "../core/claude-bin.js";
 import { missingAllowRules } from "../claude/permissions.js";
 import { linearAccess } from "../linear/access.js";
 import { relayHealth } from "../tracker/relay.js";
@@ -15,13 +15,14 @@ import type { Exec } from "../core/exec.js";
 import { Git } from "../core/git.js";
 import type { Keychain } from "../core/keychain.js";
 import { killSwitchOn } from "../core/killswitch.js";
-import type { Launchd } from "../core/launchd.js";
+import { jobEnv, type Launchd } from "../core/launchd.js";
 import { paths, TEAM_CONFIG_FILE } from "../core/paths.js";
 import { profileChecks, type Check } from "../core/profile.js";
 import { RunLogStore } from "../core/runlog-store.js";
 import { teamSkillPath } from "../core/skills.js";
 import type { RunLogEntry } from "../core/runlog.js";
 import { SIZES, type Size } from "../core/types.js";
+import { tickHealth } from "./tick.js";
 
 export interface DoctorDeps {
   team: TeamConfig | null;
@@ -32,6 +33,7 @@ export interface DoctorDeps {
   exec: Exec;
   /** The Node binary the background job uses; tests pass their own. */
   execPath?: string;
+  now?: () => Date;
   /** Extra checks from ee/ (license, policy). */
   extra?: () => Promise<DoctorCheck[]>;
 }
@@ -39,6 +41,9 @@ export interface DoctorDeps {
 export interface DoctorCheck extends Check {
   level: "fail" | "warn";
 }
+
+/** How to get a supported Node. nvm works too, but the background job breaks when that version is removed. */
+export const NODE_FIX = "Install Node 24 with `brew install node` (or, with nvm: `nvm install 24 && nvm alias default 24`), open a new Terminal window, reinstall pmx (INSTALL.md step 2), then run `pmx init`";
 
 /** Token shapes that must never appear in a plain-text config (SEC-10). */
 const TOKEN_SHAPES = /\b(xox[abpr]-[\w-]{10,}|lin_(api|oauth)_\w{20,}|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-ant-[\w-]{20,}|pmxm_\w{20,})/;
@@ -49,13 +54,25 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   const add = (id: string, ok: boolean, detail: string, level: "fail" | "warn" = "fail") => out.push({ id, ok, detail, level });
 
   add("os.macos", process.platform === "darwin", "macOS (v1 supports macOS only, SCOPE-3)");
-  add("node", nodeSupported(), `Node ${process.versions.node}${nodeSupported() ? "" : ": PMX needs 22.12 or later (24 recommended): brew install node"}`);
+  add("node", nodeSupported(), `Node ${process.versions.node}${nodeSupported() ? "" : `: PMX needs 22.12 or later (24 recommended). ${NODE_FIX}`}`);
   // The background job keeps this Node's path, so a version manager switching or removing it stops the job.
   const execPath = d.execPath ?? process.execPath;
   if (/\/\.(nvm|fnm|volta|asdf)\/|\/n\/versions\//.test(execPath))
     add("node.path", false, `Node runs from a version manager (${execPath}); the background job breaks if that version is switched or removed. Recommended: brew install node, reinstall pmx, then \`pmx init\``, "warn");
   const cc = await resolveClaude(d.exec);
   add("claude.installed", !!cc, cc ? `Claude Code ${cc.version}${cc.onPath ? "" : ` at ${cc.cmd} (not on your shell's PATH; PMX finds it there)`}` : "Claude Code installed (https://code.claude.com)");
+  // Each config folder has its own sign-in: a profile that isn't signed in fails every run with "Not logged in".
+  const signIn = cc ? await profileSignedIn(d.exec) : null;
+  if (signIn) add("profile.signed-in", signIn.ok, signIn.detail);
+  // launchd has no shell PATH: an npm install of Claude Code under nvm is invisible to the job.
+  const job = await d.launchd.installed();
+  if (job && cc) {
+    const env = jobEnv(job);
+    const r = await d.exec(env.PMX_CLAUDE ?? "claude", ["--version"], { env: { ...process.env, PATH: env.PATH }, timeoutMs: 15000 });
+    add("schedule.job-claude", r.code === 0, r.code === 0
+      ? `the background job finds Claude Code${env.PMX_CLAUDE ? ` at ${env.PMX_CLAUDE}` : ""}`
+      : `the background job can't find Claude Code${cc.onPath ? "" : ` (it's at ${cc.cmd})`}, so its runs fail with "spawn claude ENOENT": run \`pmx init\` again and say yes to the background job`);
+  }
 
   add("config.personal", !!d.personal, d.personal ? `personal config at ${paths.config()}` : "personal config missing: run `pmx init`");
   add("config.team", !!d.team, d.team ? `${TEAM_CONFIG_FILE} valid (team ${d.team.team})` : `team config: ${d.teamError ?? "missing"}`);
@@ -93,6 +110,10 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   for (const t of tasks) {
     const state = await taskState(t);
     add(`claude.task.${t.id}`, state === "current", `Claude scheduled task "${t.title}"${state === "current" ? "" : state === "outdated" ? ` has an older prompt: ${fix}` : ` is missing: ${fix}`}`, "warn");
+    if (state !== "missing") {
+      const ran = await taskRunHealth(t, d.now?.() ?? new Date());
+      add(`claude.task.${t.id}.ran`, ran.ok, `"${t.title}" ${ran.detail}`, "warn");
+    }
   }
   // CLAUDE-3: without always-allow rules, a scheduled run waits on a prompt nobody answers and blocks later runs.
   if (await claudePresent()) {
@@ -147,6 +168,8 @@ export async function runDoctor(d: DoctorDeps): Promise<DoctorCheck[]> {
   add("model.plan", plan !== "free", plan === "free" ? "Claude Free doesn't include Claude Code: PMX needs a Pro, Max, Team or Enterprise plan" : `model plan "${plan}"`, "warn");
 
   add("schedule.launchd", await d.launchd.isLoaded(), "one launchd job registered (runs `pmx tick` every 30 min)", "warn");
+  const tick = tickHealth(st.lastTick);
+  if (tick) add("schedule.tick", tick.ok, tick.detail, "warn");
 
   const git = new Git(repo, d.exec);
   const ks = await killSwitchOn(git).catch(() => ({ on: false, reason: null }));

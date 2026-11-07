@@ -2,6 +2,7 @@ import type { Ctx } from "../core/context.js";
 import { killSwitchOn } from "../core/killswitch.js";
 import { RunLogStore } from "../core/runlog-store.js";
 import { loadState } from "../core/state.js";
+import { tickHealth } from "./tick.js";
 import { budget } from "../budget/provider.js";
 
 export async function runStatus(ctx: Ctx, extra: string[] = []): Promise<string> {
@@ -16,6 +17,8 @@ export async function runStatus(ctx: Ctx, extra: string[] = []): Promise<string>
   const b = budget(personal, team, state, ctx.now());
   lines.push(`Spend today: $${b.spentUsd.toFixed(2)} of $${b.capUsd.toFixed(2)} (${b.source}); resets in ${Math.floor(b.minutesToReset / 60)}h ${b.minutesToReset % 60}m`);
   lines.push(`Last digest: ${state.lastDigestWeek ?? "never"}`);
+  const tick = tickHealth(state.lastTick);
+  lines.push(tick ? `Background job: ${tick.ok ? "" : "✘ "}${tick.detail.replace(/^background job('s)? /, "")}` : "Background job: no pass recorded yet");
 
   const store = new RunLogStore(ctx);
   if (await store.exists()) {

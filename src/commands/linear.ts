@@ -1,9 +1,10 @@
-import { formatTasks, tasksJson } from "../claude/tasks.js";
+import { formatTasks, LINEAR_SYNC_TASK, tasksJson } from "../claude/tasks.js";
 import { boardJson, checkBoard, formatBoard, renderBoard, setBoardUrl, boardUrl } from "../claude/board.js";
 import { appSkillInstalled, appSkillTarget, BOARD_SKILL, installAppSkill } from "../claude/skill.js";
 import { addAllowRules, claudeSettingsFile } from "../claude/permissions.js";
 import { exec } from "../core/exec.js";
 import { macKeychain } from "../core/keychain.js";
+import { markTaskRun } from "../core/state.js";
 import { linearAccess } from "../linear/access.js";
 import { linearLogin, linearLogout, readGrant } from "../linear/oauth.js";
 import { checkRelay, readOutbox, readSnapshot, relayPrompt } from "../tracker/relay.js";
@@ -57,10 +58,12 @@ export const linearCommands: Command[] = [
       if (sub === "relay") {
         if (a.values.check) {
           console.log((await checkRelay(ctx.team, ctx.now())).join("\n"));
+          await markTaskRun(LINEAR_SYNC_TASK.id, "finish", ctx.now());
           return 0;
         }
         if (a.values.prompt) {
           console.log(await relayPrompt(ctx.team));
+          await markTaskRun(LINEAR_SYNC_TASK.id, "start", ctx.now());
           return 0;
         }
         console.log("The Claude relay runs from a scheduled task in your Claude app. See which tasks this machine needs with `pmx schedule`.");

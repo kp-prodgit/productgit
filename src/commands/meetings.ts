@@ -1,9 +1,10 @@
+import { COLLECT_TASK } from "../claude/tasks.js";
 import { checkCollected, collectPrompt, ensureCollectFolder } from "../collect/collect.js";
 import { rollup } from "../company/rollup.js";
 import { savePersonalConfig } from "../core/config.js";
 import type { Ctx } from "../core/context.js";
 import { services } from "../core/services.js";
-import { loadState } from "../core/state.js";
+import { loadState, markTaskRun } from "../core/state.js";
 import { localDay, startOfDay } from "../meetings/ledger.js";
 import { completeTodo, formatTodos, loadTodos, refreshTodos } from "../todo/todo.js";
 import type { Command } from "./index.js";
@@ -29,6 +30,7 @@ export const meetingCommands: Command[] = [
       }
       if (a.values.prompt) {
         console.log(await collectPrompt(ctx, { scope: a.values.team ? "team" : "mine" }));
+        await markTaskRun(COLLECT_TASK.id, "start", ctx.now());
         return 0;
       }
       const added = await ensureCollectFolder(ctx.personal);
@@ -72,6 +74,8 @@ export const meetingCommands: Command[] = [
         console.log(`Meetings since ${localDay(since)}: ${r.meetings.read} read now, ${r.meetings.alreadyRead} already read for to-dos.`);
         console.log(r.added.length ? `${a.values["dry-run"] ? "Would add" : "Added"} ${r.added.length} to-do(s):\n${formatTodos(r.added)}` : "No new to-dos.");
         if (r.receiptId) console.log(`See how each meeting was read: pmx explain ${r.receiptId}`);
+        // The collection task's last step (COLLECT_TASK step 4), so its run counts as finished.
+        if (!a.values["dry-run"]) await markTaskRun(COLLECT_TASK.id, "finish", ctx.now());
         return 0;
       }
       const store = await loadTodos();

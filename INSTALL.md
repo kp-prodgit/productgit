@@ -4,7 +4,7 @@ This guide is written for **Claude Code** to follow on a PM's Mac. To use it, op
 
 > Install PMX following https://github.com/kp-prodgit/productgit/blob/main/INSTALL.md
 
-Version: **0.10.0**. Package: `productgit-0.10.0.tgz` from the [v0.10.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.10.0).
+Version: **0.10.1**. Package: `productgit-0.10.1.tgz` from the [v0.10.1 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.10.1).
 
 ---
 
@@ -31,11 +31,21 @@ Run each check and report pass or fail:
 | npm can install globally | `npm prefix -g`, then `test -w "$(npm prefix -g)/lib/node_modules" && echo ok` | prints `ok` |
 | Claude Code | `claude --version`, or `~/.local/bin/claude --version` if `claude` isn't found | prints a version |
 | git | `git --version` | prints a version |
+| PMX already installed? | `pmx --version` and `command -v pmx` | either answer is fine; note it for "Upgrading" below |
 
 Fixes:
-- **Node missing, too old, or npm can't install globally:** suggest `brew install node` (Homebrew installs Node 24). If Homebrew isn't installed, point the user to https://brew.sh. Don't suggest `sudo npm` and don't use nvm: PMX's background job remembers Node's path, and nvm switching or removing a version breaks it.
+- **Node missing, too old, or npm can't install globally:** suggest `brew install node` (Homebrew installs Node 24), then a new Terminal window. If Homebrew isn't installed, point the user to https://brew.sh. Don't suggest `sudo npm`. A user who prefers nvm can run `nvm install 24 && nvm alias default 24` instead; tell them PMX's background job remembers that Node's folder, so removing that version later breaks the job until they run `pmx init` again. If they install anyway on an older Node, npm stops with the same steps.
 - **Claude Code missing:** point the user to https://code.claude.com.
 - **Not macOS:** stop. PMX supports macOS only for now.
+
+#### Upgrading an older PMX
+
+If `pmx --version` printed a version, this is an upgrade. Follow the same steps, with these differences:
+- **Never run `pmx uninstall`.** It deletes `~/.pmx` (the user's settings, to-dos, collected transcripts, drafts and run receipts), PMX's keychain items and the background job. Installing over the old version keeps all of them.
+- **An old copy on a different Node:** if the old `pmx` lives outside the folder `npm prefix -g` prints after any Node change (for example under `~/.nvm/`), it can stay first on PATH. Remove it with the Node it was installed with: `npm uninstall -g productgit`.
+- **A folder the old version was built from** (a clone with `npm pack`) isn't used any more. The user can delete it.
+- **Step 4 still matters.** `pmx init` offers the saved answers as defaults, so it's quick. It asks again for any saved answer that's now invalid (for example working hours like `24:00, Mon`, which stop every agent run), offers to sign in PMX's Claude profile if it isn't, and registers the background job with the new Node's path and Claude Code's full path. A job from an older version may not find Claude Code at all.
+- **Step 6 updates older tasks.** `/pmx-schedule` updates each task whose prompt changed, creates missing ones and offers the always-allow rules.
 
 ### Step 2: install the package
 
@@ -43,19 +53,19 @@ Download the package and its checksum file into a new empty folder, check the ch
 
 ```bash
 d="$(mktemp -d)" && cd "$d"
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/productgit-0.10.0.tgz
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/SHA256SUMS
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.1/productgit-0.10.1.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.1/SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-npm install -g ./productgit-0.10.0.tgz
+npm install -g ./productgit-0.10.1.tgz
 ```
 
-If `shasum` doesn't print `productgit-0.10.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
+If `shasum` doesn't print `productgit-0.10.1.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
 
 **Joining a team that already uses PMX?** Install your team's version instead. Clone the team's PMX repo (ask the team lead for its URL), then run `npm install -g <repo>/.pmx/cli/productgit.tgz`.
 
 ### Step 3: verify
 
-- `pmx --version` prints `0.10.0`, or the team's version.
+- `pmx --version` prints `0.10.1`, or the team's version.
 - `command -v pmx` is inside the folder `npm prefix -g` printed.
 
 If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user to open a new Terminal window, or add `$(npm prefix -g)/bin` to their PATH.
@@ -67,19 +77,22 @@ If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user t
 Tell the user beforehand:
 - **The PMX repo** holds the team's shared skills, memory and settings. On their own: accept the default, and PMX creates one at `~/pmx`. Joining a team: give the folder where they cloned the team repo.
 - **Every answer is checked.** If they paste something by mistake, init asks again. At the end it shows a summary, and nothing is saved until they confirm.
+- **Sign in when asked.** PMX runs Claude Code with its own profile, so the user's personal setup never loads, and that profile needs its own sign-in. Init opens the browser for it. Without it, every agent run fails with "Not logged in". `pmx login` does it later.
 - **Say yes** to the background job, to the `/pmx-schedule` command, and to "Let PMX's scheduled tasks run pmx…". Without the last one, scheduled runs stop at permission prompts nobody sees.
 
 ### Step 5: check the install
 
 Run `pmx doctor --json` and read the result:
 - `ok: true` means every required check passed. Read each id in `warnings` to the user, with its `detail` from `checks`.
-- When `ok` is false, `failed` lists the failed check ids. Find each one in `checks`, and read its `detail` to the user: it says what to do.
+- When `ok` is false, `failed` lists the failed check ids. Find each one in `checks`, and read its `detail` to the user: it says what to do. The common ones: `profile.signed-in` (the user runs `pmx login`) and `schedule.job-claude` (the user runs `pmx init` again and says yes to the background job).
 
 ### Step 6: scheduled tasks in the Claude app
 
 Ask the user to open the Claude desktop app, go to the Code tab, start a new session with auto mode off, and type `/pmx-schedule`. Claude creates PMX's scheduled tasks there. Teams using Linear can type `/pmx-board` for the team board.
 
-Afterwards, run `pmx schedule` here and check that every task shows ✔.
+Then ask the user to click "Run now" on each new task in the app (Code tab → Scheduled), open the run, and choose "Always allow" for each approval it asks for, usually its first connector call (Linear, Google Drive, Granola…). A run waiting on an approval nobody answers blocks that task's later runs.
+
+Afterwards, run `pmx schedule` here and check that every task shows ✔ and says "last ran". A `!` saying a run didn't finish means it still waits for an approval.
 
 ### Step 7: report
 
