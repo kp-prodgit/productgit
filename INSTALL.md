@@ -4,7 +4,7 @@ This guide is written for **Claude Code** to follow on a PM's Mac. To use it, op
 
 > Install PMX following https://github.com/kp-prodgit/productgit/blob/main/INSTALL.md
 
-Version: **0.11.0**. Package: `productgit-0.11.0.tgz` from the [v0.11.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.11.0).
+Version: **0.12.0**. Package: `productgit-0.12.0.tgz` from the [v0.12.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.12.0).
 
 ---
 
@@ -40,7 +40,8 @@ Fixes:
 
 #### Upgrading an older PMX
 
-If `pmx --version` printed a version, this is an upgrade. Follow the same steps, with these differences:
+If `pmx --version` printed a version, this is an upgrade. Note that version. Follow the same steps, with these differences:
+- **Tell the user what's new.** After step 3, run `pmx whats-new --since <the version you noted>` and summarize it for the user in a few lines, with the commands it suggests trying.
 - **Never run `pmx uninstall`.** It deletes `~/.pmx` (the user's settings, to-dos, collected transcripts, drafts and run receipts), PMX's keychain items and the background job. Installing over the old version keeps all of them.
 - **An old copy on a different Node:** if the old `pmx` lives outside the folder `npm prefix -g` prints after any Node change (for example under `~/.nvm/`), it can stay first on PATH. Remove it with the Node it was installed with: `npm uninstall -g productgit`.
 - **A folder the old version was built from** (a clone with `npm pack`) isn't used any more. The user can delete it.
@@ -53,19 +54,19 @@ Download the package and its checksum file into a new empty folder, check the ch
 
 ```bash
 d="$(mktemp -d)" && cd "$d"
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.11.0/productgit-0.11.0.tgz
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.11.0/SHA256SUMS
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.12.0/productgit-0.12.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.12.0/SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-npm install -g ./productgit-0.11.0.tgz
+npm install -g ./productgit-0.12.0.tgz
 ```
 
-If `shasum` doesn't print `productgit-0.11.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
+If `shasum` doesn't print `productgit-0.12.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
 
 **Joining a team that already uses PMX?** Install your team's version instead. Clone the team's PMX repo (ask the team lead for its URL), then run `npm install -g <repo>/.pmx/cli/productgit.tgz`.
 
 ### Step 3: verify
 
-- `pmx --version` prints `0.11.0`, or the team's version.
+- `pmx --version` prints `0.12.0`, or the team's version.
 - `command -v pmx` is inside the folder `npm prefix -g` printed.
 
 If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user to open a new Terminal window, or add `$(npm prefix -g)/bin` to their PATH.
@@ -97,7 +98,7 @@ Afterwards, run `pmx schedule` here and check that every task shows ✔ and says
 ### Step 7: report
 
 Tell the user:
-- the installed version;
+- the installed version, and for an upgrade, what's new (`pmx whats-new --since <old version>`);
 - the doctor result, with any warnings left;
 - which scheduled tasks exist;
 - that they can switch auto mode back on now;

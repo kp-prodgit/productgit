@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ttyAsker } from "./core/ask.js";
@@ -13,6 +13,8 @@ import { claudeCode } from "./runtime/claude-code.js";
 import { refusingRuntime } from "./runtime/refusing.js";
 import { effectiveTeam } from "./core/services.js";
 import { writeProfile } from "./core/profile.js";
+import { paths } from "./core/paths.js";
+import { announceOnce, markSeen, QUIET_COMMANDS } from "./core/whats-new.js";
 import { commands as core } from "./commands/index.js";
 import { registerEe } from "../ee/src/index.js";
 
@@ -60,13 +62,22 @@ async function main(argv: string[]): Promise<number> {
     console.log(`pmx ${cmd.name}: ${cmd.summary}\n\n${cmd.usage ?? ""}`);
     return 0;
   }
-  return cmd.run({
+  // NEW-1: after an update, the first command says what's new, once, on stderr.
+  const fresh = cmd.name === "init" && !(await stat(paths.config()).then(() => true, () => false));
+  if (!QUIET_COMMANDS.has(cmd.name)) {
+    const installedAt = await loadPersonalConfig().then((p) => p.installedAt, () => null);
+    await announceOnce((s) => process.stderr.write(`${s}\n`), { installedAt });
+  }
+  const code = await cmd.run({
     values: values as Record<string, any>,
     positionals,
     ask: ttyAsker((values as Record<string, unknown>).yes === true ? true : undefined),
     ctx: realCtx,
     cliPath: fileURLToPath(import.meta.url),
   });
+  // A fresh install starts up to date.
+  if (fresh && code === 0) await markSeen();
+  return code;
 }
 
 main(process.argv.slice(2)).then(

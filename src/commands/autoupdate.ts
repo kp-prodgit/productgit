@@ -3,6 +3,8 @@ import type { Ctx } from "../core/context.js";
 import { notify } from "../core/notify.js";
 import { loadState, updateState } from "../core/state.js";
 import { installTeamVersion } from "../core/update.js";
+import { currentVersion } from "../core/version.js";
+import { newVersionNotes } from "../core/whats-new.js";
 import type { TickStep } from "./tick.js";
 
 const EVERY_MS = 3600000;
@@ -26,7 +28,9 @@ export const updateStep: TickStep = async (ctx: Ctx) => {
     st.autoUpdate = { checkedAt: ctx.now().toISOString(), result: r.result, version, notifiedFor: tellOnce ? version : st.autoUpdate?.notifiedFor ?? null };
   });
   if (r.result === "updated") {
-    await notify("Product Git updated", `pmx ${r.version} is installed. Your team asked every machine to update.`).catch(() => {});
+    const notes = await newVersionNotes(ctx.exec, currentVersion()).catch(() => null);
+    const headline = notes?.split("\n")[0]?.replace(/^What's new in pmx [\d.]+: /, "") ?? null;
+    await notify("Product Git updated", `pmx ${r.version} is installed${headline ? `: ${headline}` : ""}. See what's new: pmx whats-new`).catch(() => {});
     return `auto-update: installed pmx ${r.version}`;
   }
   if (tellOnce) {

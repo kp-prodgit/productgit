@@ -39,6 +39,7 @@ The skills also install as a Claude Code plugin: `/plugin marketplace add kp-pro
 | `digest` | Weekly digest from allowlisted sources, every claim cited, approved before commit |
 | `status` | Config, kill switch, spend and recent runs |
 | `flow` | Where data went: meetings read and held, tasks, Linear issues, agent runs, skills and spend, with the privacy audit. `--web` opens it on this Mac; `--team` shows the shared run log; `--install-skill` adds `/pmx-flow`, which publishes it as a live Claude artifact |
+| `whats-new` | What changed in this pmx, or `--since <version>`; PMX also shows it once after every update (`--json` for Claude) |
 | `never-ingest` | Your do-not-read list; `add --title`, `--person` or `--channel` adds an entry and says what it would have held |
 | `mcp` | The read-only local server the `/pmx-flow` artifact reads through; `--install` registers it with the Claude desktop app |
 | `claude` | PMX's own Claude profile, which agent runs use: `login` signs it in |

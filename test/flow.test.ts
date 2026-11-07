@@ -270,6 +270,7 @@ describe("0.11.0: the pages (FLOW-2, FLOW-5)", () => {
 
   it("builds an artifact that asks only the local PMX server, with exactly its three tools", async () => {
     process.env.PMX_CLAUDE_HOME = await tmp("claude-home-");
+    process.env.PMX_CLAUDE_DESKTOP_CONFIG = join(await tmp("desktop-"), "none.json");
     expect(flowCapabilities()).toEqual({ mcp: { servers: [{ server: "host:pmx", tools: MCP_TOOLS.map((t) => t.name) }] } });
     const html = flowArtifact({ team: "t</script><b>", version: "0.11.0", boardUrl: null });
     expect(html).toMatch(/^<title>PMX Flow<\/title>/);
@@ -280,6 +281,7 @@ describe("0.11.0: the pages (FLOW-2, FLOW-5)", () => {
     const j = await flowJson(null, null);
     expect(j).toMatchObject({ ready: true, title: "PMX Flow", capabilities: flowCapabilities(), mcpInstalled: false });
     expect(await readFile((j as any).html, "utf8")).toContain("host:pmx");
+    delete process.env.PMX_CLAUDE_DESKTOP_CONFIG;
   });
 
   it("doctor fails when the privacy rules let a canary through, and warns when the published page can't reach PMX", async () => {

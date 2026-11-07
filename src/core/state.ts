@@ -28,11 +28,16 @@ export interface State {
    * never wrote because of the do-not-read list leave no other trace on this Mac. Newest last, 14 days.
    */
   collectReports: { at: string; connector: string | null; saved: number; skipped: Record<CollectSkip, number> }[];
+  /**
+   * What's new (NEW-1): `seen` is the last version this Mac was told about; `since` is the version an update
+   * replaced, so the new pmx can say what changed since then.
+   */
+  whatsNew: { seen: string | null; since: string | null } | null;
   /** When this Mac's pmx started tracking task runs. Older runs left no record, so "never ran" counts from here. */
   taskRunsSince: string | null;
 }
 
-const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null, cloudVersions: null, autoUpdate: null, lastTick: null, taskRuns: {}, taskRunsSince: null, caps: {}, collectReports: [] };
+const EMPTY: State = { lastDigestWeek: null, lastSynthAt: null, ledger: {}, eeTrialStartedAt: null, lastEventSyncAt: null, lastPipelineSyncAt: null, lastBrainAt: null, lastCollectAt: null, lastRollupAt: null, cloudVersions: null, autoUpdate: null, lastTick: null, taskRuns: {}, taskRunsSince: null, caps: {}, collectReports: [], whatsNew: null };
 
 /** Why the collection task skipped a meeting without saving it. */
 export const COLLECT_SKIPS = ["never-ingest-title", "never-ingest-person", "no-transcript", "already-collected", "outside-window"] as const;

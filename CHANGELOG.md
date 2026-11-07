@@ -2,6 +2,18 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.12.0: PMX tells you what's new
+
+Every release now tells existing users, and the Claude Code session running the update, what changed (NEW-1).
+
+- **Once, after any update.** The first `pmx` command after an update prints what's new since the version this Mac had. It prints to stderr, so `--json` output stays clean. It covers every release in between, and shows only once. The background job, `pmx mcp` and `pmx uninstall` never print it.
+- **`pmx update` and `pmx update --latest`** print the new version's notes as soon as they install, so whoever ran the update sees them right away, including Claude Code.
+- **The auto-update notification** names the new release's headline.
+- **`pmx whats-new`** shows this version's notes again. `--since <version>` covers everything after one, `--all` lists every release, and `--json` is for Claude and scripts.
+- **Manual installs too.** After installing over a pmx older than 0.12.0 by hand (INSTALL.md), PMX covers the releases since this Mac was set up, up to three. A fresh install starts up to date.
+- **Every release ships notes.** The notes are a list inside PMX, newest first. A test fails the build when this version has no entry or CHANGELOG.md has no matching section, so no feature reaches users unannounced.
+- INSTALL.md's upgrade steps now have Claude run `pmx whats-new --since <old version>` and tell the user.
+
 ## 0.11.0: see where your data went
 
 A flow view of everything PMX does, built from records it keeps. The goal is that you can check, rather than trust, that no confidential meeting reached Linear.

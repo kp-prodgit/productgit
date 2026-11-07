@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { Exec } from "./exec.js";
 import { packageRoot } from "./skills.js";
 import { VENDORED_CLI } from "./vendor.js";
+import { markUpdatingFrom } from "./whats-new.js";
 import { compareVersions, currentVersion, isVersion, vendoredVersion } from "./version.js";
 
 export type UpdateOutcome =
@@ -37,7 +38,11 @@ export async function installTeamVersion(repoPath: string, exec: Exec, o: { forc
 
 async function npmInstall(tgz: string, version: string, exec: Exec): Promise<UpdateOutcome> {
   const r = await exec("npm", ["install", "-g", tgz], { timeoutMs: 300000 });
-  if (r.code === 0) return { result: "updated", version };
+  if (r.code === 0) {
+    // The new pmx says what changed since this one, once (NEW-1).
+    await markUpdatingFrom(currentVersion());
+    return { result: "updated", version };
+  }
   if (/EACCES|permission denied/i.test(r.stderr)) return { result: "needs-sudo", version, command: `sudo npm install -g "${tgz}"` };
   return { result: "failed", version, error: r.stderr.trim().split("\n").slice(-3).join(" ") || `npm exited ${r.code}` };
 }

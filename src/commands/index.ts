@@ -15,7 +15,8 @@ import { runStatus } from "./status.js";
 import { digestStep, recordTick, runTick, type TickStep } from "./tick.js";
 import { runUninstall } from "./uninstall.js";
 import { VENDORED_CLI, vendorCli } from "../core/vendor.js";
-import { atLeast, currentVersion, vendoredVersion } from "../core/version.js";
+import { atLeast, compareVersions, currentVersion, isVersion, vendoredVersion } from "../core/version.js";
+import { formatNotes, markSeen, newVersionNotes, notesBetween, RELEASE_NOTES } from "../core/whats-new.js";
 import { installLatestRelease, installTeamVersion, type UpdateOutcome } from "../core/update.js";
 import { Git } from "../core/git.js";
 import { loadState } from "../core/state.js";
@@ -67,6 +68,13 @@ export const tickSteps: [string, TickStep][] = [
   ["pull", pullStep],
   ["events", syncAnalytics],
 ];
+
+/** Right after `pmx update` installs, prints what's new from the new pmx, so whoever ran it (or Claude Code) sees it. */
+async function showNewNotes(version: string): Promise<void> {
+  const text = await newVersionNotes(exec, currentVersion()).catch(() => null);
+  console.log(text ? `\n${text}` : `\nSee what's new in pmx ${version}: pmx whats-new`);
+  if (text) await markSeen(version);
+}
 
 export const commands: Command[] = [
   {
@@ -227,6 +235,7 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
     async run(a) {
       if (a.values.latest) {
         const r = await installLatestRelease(exec, { force: a.values.force });
+        if (r.result === "updated") await showNewNotes(r.version);
         console.log({
           current: `pmx ${currentVersion()} is the latest release.`,
           updated: `Installed pmx ${"version" in r ? r.version : ""}. Team lead: run \`pmx vendor --require\` and merge it, so your team gets it too.`,
@@ -267,6 +276,7 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
         failed: `\nnpm install failed: ${r.result === "failed" ? r.error : ""}`,
       };
       console.log(say[r.result]);
+      if (r.result === "updated") await showNewNotes(r.version);
       return r.result === "current" || r.result === "updated" ? 0 : 1;
     },
   },
@@ -274,6 +284,18 @@ Commit ${a.values.require ? "both files" : "it"} in a PR of its own. Teammates u
   ...linearCommands,
   ...teamCommands,
   ...flowCommands,
+  {
+    name: "whats-new",
+    summary: "What's new in this pmx, or in every version after one you name; --json for Claude and scripts (NEW-1)",
+    usage: "pmx whats-new [--since <version>] [--all] [--json]",
+    options: { since: { type: "string" }, all: { type: "boolean" }, json: { type: "boolean" } },
+    async run(a) {
+      if (a.values.since && !isVersion(String(a.values.since))) throw new Error(`--since takes a version like 0.10.1, not "${a.values.since}".`);
+      const notes = a.values.all ? RELEASE_NOTES.filter((n) => (compareVersions(n.version, currentVersion()) ?? 0) <= 0) : notesBetween(a.values.since ? String(a.values.since) : null);
+      console.log(a.values.json ? JSON.stringify({ version: currentVersion(), notes }, null, 2) : formatNotes(notes));
+      return 0;
+    },
+  },
   reviewCommand,
   ...cloudCommands,
   {
