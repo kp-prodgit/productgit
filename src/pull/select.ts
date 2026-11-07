@@ -31,14 +31,6 @@ export interface SelectInput {
   leasedTaskIds: Set<string>;
 }
 
-export function withinHours(p: PersonalConfig, now: Date): boolean {
-  if (!p.workingHours.days.includes(now.getDay())) return false;
-  const hm = now.getHours() * 60 + now.getMinutes();
-  const [sh = 0, sm = 0] = p.workingHours.start.split(":").map(Number);
-  const [eh = 0, em = 0] = p.workingHours.end.split(":").map(Number);
-  return hm >= sh * 60 + sm && hm < eh * 60 + em;
-}
-
 /** Linear priority: 1 urgent … 4 low, 0 none (sorted last). */
 const prio = (t: Task) => (t.priority === 0 ? 5 : t.priority);
 
@@ -48,7 +40,6 @@ const prio = (t: Task) => (t.priority === 0 ? 5 : t.priority);
 export function selectTasks(i: SelectInput): Selection {
   const blockers: string[] = [];
   const cap = i.team.reviewQueueCap;
-  if (!withinHours(i.personal, i.now)) blockers.push(`outside your working hours (${i.personal.workingHours.start}–${i.personal.workingHours.end})`);
   if (i.inReview >= cap) blockers.push(`${i.inReview} of your drafts are waiting for review (cap ${cap}); review some first`);
   if (i.budget.remainingUsd <= 0) blockers.push(`no budget left today ($${i.budget.spentUsd.toFixed(2)} of $${i.budget.capUsd.toFixed(2)} spent)`);
 

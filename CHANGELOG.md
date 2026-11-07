@@ -2,6 +2,12 @@
 
 Versions follow [semantic versioning](https://semver.org): new features raise the minor number, fixes the patch number, and anything that breaks an older CLI, file or team the major number. See "Updating" in the README.
 
+## 0.13.0: no more working hours
+
+- **PMX works whenever this Mac is on and awake.** Your daily spend cap still limits it, along with the review cap. Pulls no longer stop "outside your working hours".
+- **`pmx init` stops asking for working days and hours.** Its summary shows the spend cap instead. Hours saved by an older `pmx init` are ignored, so existing machines need nothing. Init still writes "always" to the old field, so an older pmx reading the same config behaves the same.
+- **README: updating existing machines.** A table says what to do on each kind of Mac (auto-update, `pmx update`, `pmx update --latest`, or a one-time manual install for versions older than 0.10.0), with the manual install commands. A test keeps the README's install links on the current release; they had fallen behind at 0.10.0.
+
 ## 0.12.0: PMX tells you what's new
 
 Every release now tells existing users, and the Claude Code session running the update, what changed (NEW-1).

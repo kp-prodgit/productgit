@@ -19,6 +19,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "0.13.0", date: "2026-11-07", headline: "No more working hours",
+    items: [
+      { what: "PMX works whenever this Mac is on and awake, within your daily spend cap. `pmx init` no longer asks for working days or hours, and hours you saved before are ignored: nothing to change." },
+      { what: "The README's Updating section says exactly how to update each kind of existing machine.", try: "pmx update" },
+    ],
+  },
+  {
     version: "0.12.0", date: "2026-11-07", headline: "PMX tells you what's new after every update",
     items: [
       { what: "After an update, the first pmx command shows what changed since your last version, once. Claude Code sees it too when it runs the update.", try: "pmx whats-new" },

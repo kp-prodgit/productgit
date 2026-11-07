@@ -43,9 +43,10 @@ describe("pull policy and dry-run explanations (PULL-1..4, PULL-9)", () => {
     expect(explain(s, true)).toMatch(/Would pull: T2/);
   });
 
-  it("blocks outside working hours, at the review cap, and with no budget", () => {
+  it("works whenever the Mac is on, even with old saved hours; blocks at the review cap and with no budget", () => {
     const tasks = [task("T1")];
-    expect(selectTasks(input({ tasks, now: new Date(2026, 10, 4, 20, 0) })).blockers[0]).toMatch(/outside your working hours/);
+    // A Saturday night, outside the 0.12.0-era hours saved in this config: no longer a blocker (0.13.0).
+    expect(selectTasks(input({ tasks, now: new Date(2026, 10, 7, 23, 30) })).blockers).toEqual([]);
     expect(selectTasks(input({ tasks, inReview: 3 })).blockers[0]).toMatch(/3 of your drafts are waiting for review \(cap 3\)/);
     const spent = input({ tasks });
     spent.budget = { ...spent.budget, remainingUsd: 0, spentUsd: 10 };

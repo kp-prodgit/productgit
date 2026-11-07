@@ -89,36 +89,8 @@ export async function checkGitUrl(a: string): Promise<string | null> {
   return "Enter a git URL like https://github.com/acme/pmx.git or git@github.com:acme/pmx.git";
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-/** "Mon-Fri", "Mon,Wed,Fri" or "Sun-Sat" → day numbers (0 = Sunday). Null when it can't be read. */
-export function parseDays(a: string): number[] | null {
-  const day = (s: string) => DAYS.findIndex((d) => d.toLowerCase() === s.trim().slice(0, 3).toLowerCase());
-  const out = new Set<number>();
-  for (const part of a.split(",").map((x) => x.trim()).filter(Boolean)) {
-    const [from, to] = part.split("-");
-    const f = day(from ?? ""), t = to === undefined ? f : day(to);
-    if (f < 0 || t < 0) return null;
-    for (let i = f; ; i = (i + 1) % 7) { out.add(i); if (i === t) break; }
-  }
-  return out.size ? [...out].sort((x, y) => x - y) : null;
-}
-
-export function formatDays(days: number[]): string {
-  const s = [...days].sort((a, b) => a - b);
-  const contiguous = s.length > 1 && s.every((d, i) => i === 0 || d === s[i - 1]! + 1);
-  return contiguous ? `${DAYS[s[0]!]}-${DAYS[s[s.length - 1]!]}` : s.map((d) => DAYS[d]).join(",");
-}
-
-/** "9:00-18:00" → ["09:00", "18:00"]. The end may be 24:00 and must come after the start. */
-export function parseHours(a: string): [string, string] | null {
-  const m = /^(\d{1,2}):([0-5]\d)\s*-\s*(\d{1,2}):([0-5]\d)$/.exec(a.trim());
-  if (!m) return null;
-  const [sh, sm, eh, em] = [m[1], m[2], m[3], m[4]].map(Number) as [number, number, number, number];
-  if (sh > 23 || eh > 24 || (eh === 24 && em > 0) || eh * 60 + em <= sh * 60 + sm) return null;
-  const hhmm = (h: number, mm: number) => `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-  return [hhmm(sh, sm), hhmm(eh, em)];
-}
+/** What older pmx versions read as working hours: always. Since 0.13.0 PMX works whenever the Mac is on. */
+export const ALWAYS = { days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "24:00" };
 
 export async function runInit(d: InitDeps): Promise<PersonalConfig> {
   const { ask, out } = d;
@@ -179,8 +151,6 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
     const unknown = split(a).filter((c) => !cats.includes(c));
     return unknown.length ? `Unknown: ${unknown.join(", ")}. Pick from ${cats.join(", ")}` : split(a).length ? null : "Pick at least one";
   }));
-  const days = parseDays(await askValid(d, "Working days (like Mon-Fri or Mon,Wed,Fri)", formatDays(existing?.workingHours.days ?? [1, 2, 3, 4, 5]), (a) => (parseDays(a) ? null : "Use day names like Mon-Fri or Mon,Tue,Thu")))!;
-  const [start, end] = parseHours(await askValid(d, "Working hours, in this Mac's local time (HH:MM-HH:MM)", existing ? `${existing.workingHours.start}-${existing.workingHours.end}` : "09:00-18:00", (a) => (parseHours(a) ? null : "Use HH:MM-HH:MM, like 09:00-18:00, with the end after the start")))!;
   const cap = team.caps.perDayUsd;
   const dailyUsd = Number(await askValid(d, `Daily spend cap for your agent's runs, in USD (0 pauses it; your team allows up to ${cap})`, String(existing?.budget.dailyUsd ?? Math.min(10, cap)), (a) => {
     const n = Number(a);
@@ -209,7 +179,7 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
     installedAt: existing?.installedAt ?? d.now().toISOString(),
     plan,
     categories,
-    workingHours: { days, start, end },
+    workingHours: ALWAYS,
     budget: { dailyUsd, resetHour: existing?.budget.resetHour ?? 0, overrideUsd: null },
     sources: { transcriptDirs, slackChannel },
     neverIngest: { people, channels, meetingTitles },
@@ -226,7 +196,7 @@ export async function runInit(d: InitDeps): Promise<PersonalConfig> {
     `  PMX repo       ${repoPath} (${repoNote}, team "${team.team}", ${tracker})`,
     `  You            ${handle}, ${plan} plan`,
     `  Agent work     ${categories.join(", ")}`,
-    `  Working time   ${formatDays(days)} ${start}-${end} local time, up to $${dailyUsd} a day${dailyUsd === 0 ? " (paused)" : ""}`,
+    `  Spend          up to $${dailyUsd} a day${dailyUsd === 0 ? " (paused)" : ""}; PMX works whenever this Mac is on and awake`,
     `  Transcripts    ${transcriptDirs.join(", ") || "none"}`,
     ...(team.allowedSources.includes("slack") ? [`  Slack digest   ${slackChannel ?? "none"}`] : []),
     `  Never ingest   ${count(people.length, "person", "people")}, ${count(meetingTitles.length, "meeting title")}, ${count(channels.length, "channel")}`,

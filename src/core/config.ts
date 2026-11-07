@@ -52,7 +52,11 @@ export interface PersonalConfig {
   installedAt: string;
   plan: Plan;
   categories: string[];
-  workingHours: { days: number[]; start: string; end: string };
+  /**
+   * No longer used (0.13.0): PMX works whenever the Mac is on and awake. `pmx init` still writes "always", so an
+   * older pmx reading this file behaves the same; older saved hours are ignored.
+   */
+  workingHours?: { days: number[]; start: string; end: string };
   budget: { dailyUsd: number; resetHour: number; overrideUsd?: number | null };
   sources: { transcriptDirs: string[]; slackChannel: string | null };
   /** The personal never-ingest list (B2). Sensitive in itself, so it stays here. */

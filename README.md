@@ -11,16 +11,16 @@ The easy way: open Claude Code and say *"Install PMX following https://github.co
 By hand, with Node 22.12 or later (24 recommended: `brew install node`):
 
 ```bash
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/productgit-0.10.0.tgz
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.10.0/SHA256SUMS
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/productgit-0.13.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-npm install -g ./productgit-0.10.0.tgz
+npm install -g ./productgit-0.13.0.tgz
 pmx init
 ```
 
 The release package is prebuilt and has no dependencies, so installing it downloads and builds nothing. Joining a team that already uses PMX? Clone its PMX repo and install the team's copy instead: `npm install -g <repo>/.pmx/cli/productgit.tgz`. Use Homebrew's Node rather than nvm: the background job remembers Node's path, and nvm switching or removing a version breaks it.
 
-`pmx init` explains the PMX repo, checks every answer (and asks again if one is wrong), shows a summary, and saves nothing until you confirm. Then it sets up or joins your team's PMX repo, stores tokens in the keychain, writes a clean run profile and registers one background job. Then:
+`pmx init` doesn't ask for working hours: PMX works whenever this Mac is on and awake, within your daily spend cap. It explains the PMX repo, checks every answer (and asks again if one is wrong), shows a summary, and saves nothing until you confirm. Then it sets up or joins your team's PMX repo, stores tokens in the keychain, writes a clean run profile and registers one background job. Then:
 
 ```bash
 pmx doctor        # green/red checklist, including every clean-profile check (--json for scripts)
@@ -90,12 +90,33 @@ Share it from the artifact's Share menu, then add `"board": { "url": "<link>" }`
 
 ## Updating
 
-Your team's PMX repo holds the CLI package everyone installs (`.pmx/cli/productgit.tgz`), so a team moves to a new version together.
+Your team's PMX repo holds the CLI package everyone installs (`.pmx/cli/productgit.tgz`), so a team moves to a new version together. After any update, the first `pmx` command says what's new, once; `pmx whats-new` shows it again.
 
-- **The team lead:** run `pmx update --latest` (it installs the newest release after checking its SHA256SUMS), then `pmx vendor --require` and merge that PR. It stores the new package and makes it the team's minimum version.
-- **Automatically:** add `--auto-update` (`pmx vendor --require --auto-update`) and every machine's background job installs the team's version within the hour, with no Claude usage and even when the Claude app is closed. It never downgrades. Where npm's global folder needs `sudo` (Node installed as root), PMX can't type the password, so it tells the PM once to run `pmx update`; installing Node with Homebrew avoids that.
-- **Everyone else, or by hand:** run `pmx update`. It pulls the PMX repo and installs the team's version. `pmx doctor` says when you're behind.
-- **If you don't update:** your digest, to-dos and `pmx explain` keep working, but shared team work (suggesting tasks, pulling, the brain, the company roll-up) stops with a message until you do. That way an old version never writes something the rest of the team's versions would misread.
+**Existing machines: what to do**
+
+| This Mac | To update |
+|---|---|
+| On pmx 0.6.0 or later, team has auto-update on | Nothing. The background job installs the team's version within the hour, even when the Claude app is closed, and the next `pmx` command says what's new. |
+| On pmx 0.6.0 or later, no auto-update | `pmx update`. It pulls the PMX repo, installs the team's version and prints what's new. |
+| Solo, or the team lead, on pmx 0.10.0 or later | `pmx update --latest` installs the newest release after checking its SHA256SUMS. Team lead: then `pmx vendor --require` and merge it. |
+| Older than 0.10.0, or installed from a source folder | Install the release once by hand (below), then run `pmx init` again: it keeps your answers and re-registers the background job with the new Node and Claude Code paths. |
+
+Install by hand over an older version (this keeps `~/.pmx`, your settings and keychain items; never run `pmx uninstall` to update):
+
+```bash
+d="$(mktemp -d)" && cd "$d"
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/productgit-0.13.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/SHA256SUMS
+shasum -a 256 -c SHA256SUMS
+npm install -g ./productgit-0.13.0.tgz
+pmx whats-new --since <the version you had>
+```
+
+Then run `pmx doctor`. It names anything left to do: for example, `pmx claude login` when PMX's Claude profile isn't signed in, or typing `/pmx-schedule` in the Claude app when a scheduled task's prompt changed.
+
+- **No working hours since 0.13.0.** PMX works whenever this Mac is on and awake; your daily spend cap still limits it. Hours saved by an older `pmx init` are ignored, so there's nothing to change.
+- **Auto-update and sudo.** Where npm's global folder needs `sudo` (Node installed as root), PMX can't type the password, so it tells you once to run `pmx update`. Installing Node with Homebrew avoids that.
+- **If you don't update:** your digest, to-dos and `pmx explain` keep working, but shared team work (suggesting tasks, pulling, the brain, the company roll-up) stops with a message until you do. That way an old version never writes something the rest of the team's versions would misread. `pmx doctor` says when you're behind.
 - **What never breaks within a major version:** shared files and Linear labels only gain things; a file written by a newer pmx is refused, not misread; every release is tested against files older releases wrote; and the hosted API only adds to `/v1`. Details in [docs/control-plane-api.md](docs/control-plane-api.md) ("Versions").
 
 ## Free and paid

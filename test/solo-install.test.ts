@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { doctorJson, runDoctor } from "../src/commands/doctor.js";
-import { checkFolder, checkGitUrl, formatDays, parseDays, parseHours, runInit } from "../src/commands/init.js";
+import { checkFolder, checkGitUrl, runInit } from "../src/commands/init.js";
 import type { Asker } from "../src/core/ask.js";
 import { nodeSupported, resolveClaude } from "../src/core/claude-bin.js";
 import { loadTeamConfig } from "../src/core/config.js";
@@ -74,10 +74,11 @@ describe("0.10.0: a solo install that works", () => {
     expect(JSON.parse(JSON.stringify(j)).checks.length).toBe(checks.length);
   });
 
-  it("re-asks wrong answers instead of saving them, and reads working days and hours", async () => {
+  it("re-asks wrong answers instead of saving them, and never asks for working days or hours", async () => {
     const dir = await tmp();
     const repo = join(dir, "pmx");
     const out = quietOut();
+    const asked: string[] = [];
     const personal = await runInit({
       ask: sequenceAsker({
         "PMX repo checkout": ["/pmx-schedule", "pmx schedule --install-skill", repo],
@@ -85,26 +86,26 @@ describe("0.10.0: a solo install that works", () => {
         "Team name": ["acme"],
         handle: ["ana smith", "ana"],
         "Categories": ["spec, nonsense", "spec"],
-        "Working days": ["weekdays", "Mon-Thu"],
-        "Working hours": ["24:00, Mon", "9:30-17:00"],
         "Daily spend": ["ten", "0"],
         transcripts: [join(dir, "t")],
-      }),
+      }, asked),
       keychain: memoryKeychain(), launchd: fakeLaunchd(), exec: withClaude, out, now: () => new Date(), cliPath: "/x",
     });
-    expect(personal).toMatchObject({ repoPath: repo, handle: "ana", categories: ["spec"], workingHours: { days: [1, 2, 3, 4], start: "09:30", end: "17:00" }, budget: { dailyUsd: 0 } });
+    // Older pmx versions still read workingHours, so init writes "always" (0.13.0).
+    expect(personal).toMatchObject({ repoPath: repo, handle: "ana", categories: ["spec"], workingHours: { days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "24:00" }, budget: { dailyUsd: 0 } });
+    expect(asked.some((q) => /working (days|hours)/i.test(q))).toBe(false);
     const warnings = out.lines.filter((l) => l.startsWith("WARN"));
     expect(warnings.some((w) => /"\/pmx-schedule" looks like a command, not a folder/.test(w))).toBe(true);
     expect(warnings.some((w) => /looks like a command, not a git URL/.test(w))).toBe(true);
-    expect(warnings.some((w) => /Use HH:MM-HH:MM/.test(w))).toBe(true);
-    expect(out.lines.join("\n")).toMatch(/PMX will save this setup:[\s\S]*Mon-Thu 09:30-17:00 local time, up to \$0 a day \(paused\)/);
+    expect(warnings.some((w) => /Enter a number of dollars/.test(w))).toBe(true);
+    expect(out.lines.join("\n")).toMatch(/PMX will save this setup:[\s\S]*up to \$0 a day \(paused\); PMX works whenever this Mac is on and awake/);
     expect(out.lines.join("\n")).toContain('"PMX repo"');
   });
 
   it("gives up after three wrong answers and saves nothing", async () => {
     const dir = await tmp();
     await expect(runInit({
-      ask: sequenceAsker({ "PMX repo checkout": [join(dir, "pmx")], "Working hours": ["24:00, Mon"], transcripts: [join(dir, "t")] }),
+      ask: sequenceAsker({ "PMX repo checkout": [join(dir, "pmx")], "Daily spend": ["ten"], transcripts: [join(dir, "t")] }),
       keychain: memoryKeychain(), launchd: fakeLaunchd(), exec: withClaude, out: quietOut(), now: () => new Date(), cliPath: "/x",
     })).rejects.toThrow(/after three tries\. Nothing was saved/);
     expect(await stat(paths.config()).catch(() => null)).toBeNull();
@@ -146,18 +147,6 @@ describe("0.10.0: a solo install that works", () => {
     expect((await loadTeamConfig(p.repoPath)).team).toBe((await loadTeamConfig(team)).team);
   });
 
-  it("parses working days and hours", () => {
-    expect(parseDays("Mon-Fri")).toEqual([1, 2, 3, 4, 5]);
-    expect(parseDays("mon, wed, fri")).toEqual([1, 3, 5]);
-    expect(parseDays("Fri-Mon")).toEqual([0, 1, 5, 6]);
-    expect(parseDays("weekdays")).toBeNull();
-    expect(formatDays([1, 2, 3, 4, 5])).toBe("Mon-Fri");
-    expect(formatDays([1, 3, 5])).toBe("Mon,Wed,Fri");
-    expect(parseHours("9:00-18:00")).toEqual(["09:00", "18:00"]);
-    expect(parseHours("22:00-24:00")).toEqual(["22:00", "24:00"]);
-    expect([parseHours("24:00, Mon"), parseHours("18:00-09:00"), parseHours("09:00-24:30"), parseHours("25:00-26:00")]).toEqual([null, null, null, null]);
-  });
-
   it("`pmx update --latest` installs the newest release only when it matches SHA256SUMS", async () => {
     process.env.PMX_INSTALL_ROOT_FOR_TESTS = await tmp("installed-");
     const v = "99.0.0";
@@ -187,6 +176,10 @@ describe("0.10.0: a solo install that works", () => {
     expect(guide).toContain(`releases/download/v${v}/SHA256SUMS`);
     expect(guide.indexOf("auto mode off")).toBeLessThan(guide.indexOf("Step 1"));
     expect(guide).toContain("pmx doctor --json");
+    // The README's manual install and its update steps name this release too.
+    const readme = await readFile(join(root, "README.md"), "utf8");
+    expect(readme).toContain(`releases/download/v${v}/productgit-${v}.tgz`);
+    expect(readme).not.toMatch(new RegExp(`releases/download/v(?!${v.replace(/\./g, "\\.")}/)`));
     // The export script stays in the private repo, so the public repo's tests skip this part.
     const exporter = await readFile(join(root, "scripts/export-public.sh"), "utf8").catch(() => null);
     if (exporter !== null) expect(exporter).toMatch(/PUBLIC=\(.*INSTALL\.md/);

@@ -4,7 +4,7 @@ This guide is written for **Claude Code** to follow on a PM's Mac. To use it, op
 
 > Install PMX following https://github.com/kp-prodgit/productgit/blob/main/INSTALL.md
 
-Version: **0.12.0**. Package: `productgit-0.12.0.tgz` from the [v0.12.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.12.0).
+Version: **0.13.0**. Package: `productgit-0.13.0.tgz` from the [v0.13.0 release](https://github.com/kp-prodgit/productgit/releases/tag/v0.13.0).
 
 ---
 
@@ -45,7 +45,7 @@ If `pmx --version` printed a version, this is an upgrade. Note that version. Fol
 - **Never run `pmx uninstall`.** It deletes `~/.pmx` (the user's settings, to-dos, collected transcripts, drafts and run receipts), PMX's keychain items and the background job. Installing over the old version keeps all of them.
 - **An old copy on a different Node:** if the old `pmx` lives outside the folder `npm prefix -g` prints after any Node change (for example under `~/.nvm/`), it can stay first on PATH. Remove it with the Node it was installed with: `npm uninstall -g productgit`.
 - **A folder the old version was built from** (a clone with `npm pack`) isn't used any more. The user can delete it.
-- **Step 4 still matters.** `pmx init` offers the saved answers as defaults, so it's quick. It asks again for any saved answer that's now invalid (for example working hours like `24:00, Mon`, which stop every agent run), offers to sign in PMX's Claude profile if it isn't, and registers the background job with the new Node's path and Claude Code's full path. A job from an older version may not find Claude Code at all.
+- **Step 4 still matters.** `pmx init` offers the saved answers as defaults, so it's quick. It asks again for any saved answer that's now invalid, offers to sign in PMX's Claude profile if it isn't, and registers the background job with the new Node's path and Claude Code's full path. A job from an older version may not find Claude Code at all.
 - **Step 6 updates older tasks.** `/pmx-schedule` updates each task whose prompt changed, creates missing ones and offers the always-allow rules.
 
 ### Step 2: install the package
@@ -54,19 +54,19 @@ Download the package and its checksum file into a new empty folder, check the ch
 
 ```bash
 d="$(mktemp -d)" && cd "$d"
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.12.0/productgit-0.12.0.tgz
-curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.12.0/SHA256SUMS
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/productgit-0.13.0.tgz
+curl -fsSLO https://github.com/kp-prodgit/productgit/releases/download/v0.13.0/SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-npm install -g ./productgit-0.12.0.tgz
+npm install -g ./productgit-0.13.0.tgz
 ```
 
-If `shasum` doesn't print `productgit-0.12.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
+If `shasum` doesn't print `productgit-0.13.0.tgz: OK`, stop and don't install. Tell the user the download didn't match the release.
 
 **Joining a team that already uses PMX?** Install your team's version instead. Clone the team's PMX repo (ask the team lead for its URL), then run `npm install -g <repo>/.pmx/cli/productgit.tgz`.
 
 ### Step 3: verify
 
-- `pmx --version` prints `0.12.0`, or the team's version.
+- `pmx --version` prints `0.13.0`, or the team's version.
 - `command -v pmx` is inside the folder `npm prefix -g` printed.
 
 If `pmx` isn't found, the npm global `bin` folder isn't on PATH. Tell the user to open a new Terminal window, or add `$(npm prefix -g)/bin` to their PATH.
